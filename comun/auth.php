@@ -1,4 +1,3 @@
-
 <?php
 
 class Auth
@@ -37,7 +36,9 @@ class Auth
         $clavePublica = Config::get('JWT_PUBLIC_KEY');
 
         if ($clavePublica === null || $clavePublica === '') {
-            Logger::error('No está configurada la clave pública JWT');
+            Logger::error(
+                'No está configurada la clave pública JWT'
+            );
             return null;
         }
 
@@ -50,14 +51,14 @@ class Auth
         $clave = openssl_pkey_get_public($clavePublica);
 
         if ($clave === false) {
-            Logger::error('No se pudo cargar la clave pública JWT');
+            Logger::error(
+                'No se pudo cargar la clave pública JWT'
+            );
             return null;
         }
 
-        $contenidoFirmado = $cabecera . '.' . $payload;
-
         $resultado = openssl_verify(
-            $contenidoFirmado,
+            $cabecera . '.' . $payload,
             $firmaBinaria,
             $clave,
             OPENSSL_ALGO_SHA256
@@ -72,8 +73,8 @@ class Auth
             || !is_numeric($datosUsuario['exp'])
             || (int) $datosUsuario['exp'] <= time()
             || !isset($datosUsuario['id'])
-            || !isset($datosUsuario['rol'])
-            || !isset($datosUsuario['csrf'])
+            || !is_string($datosUsuario['rol'])
+            || $datosUsuario['rol'] === ''
         ) {
             return null;
         }
@@ -86,10 +87,7 @@ class Auth
         $usuario = self::usuarioActual();
 
         if ($usuario === null) {
-            Response::json([
-                'error' => 'No autenticado'
-            ], 401);
-
+            Response::error('No autenticado', 401);
             exit;
         }
 
@@ -97,10 +95,10 @@ class Auth
             $roles !== []
             && !in_array($usuario['rol'], $roles, true)
         ) {
-            Response::json([
-                'error' => 'No tiene permisos para realizar esta operación'
-            ], 403);
-
+            Response::error(
+                'No tiene permisos para realizar esta operación',
+                403
+            );
             exit;
         }
 
@@ -115,26 +113,30 @@ class Auth
             return;
         }
 
-        $tokenEnviado = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
-        $tokenEsperado = $usuario['csrf'] ?? '';
+        /*
+         * PENDIENTE:
+         * El equipo debe definir cómo se obtiene el token CSRF
+         * esperado. El JWT acordado contiene id, rol y exp,
+         * por lo que no podemos obtenerlo de ese token.
+         *
+         * Hasta definir el mecanismo, no se permiten operaciones
+         * modificadoras que dependan de esta validación.
+         */
 
-        if (
-            !is_string($tokenEnviado)
-            || !is_string($tokenEsperado)
-            || $tokenEnviado === ''
-            || $tokenEsperado === ''
-            || !hash_equals($tokenEsperado, $tokenEnviado)
-        ) {
-            Response::json([
-                'error' => 'Token CSRF inválido'
-            ], 403);
+        Logger::error(
+            'Mecanismo CSRF pendiente de definición'
+        );
 
-            exit;
-        }
+        Response::error(
+            'No se puede verificar la protección CSRF',
+            403
+        );
+        exit;
     }
 
-    private static function decodificarJson(string $valor): ?array
-    {
+    private static function decodificarJson(
+        string $valor
+    ): ?array {
         $decodificado = self::decodificarBase64Url($valor);
 
         if ($decodificado === null) {
@@ -150,7 +152,10 @@ class Auth
         string $valor
     ): ?string {
         $base64 = strtr($valor, '-_', '+/');
-        $base64 .= str_repeat('=', (4 - strlen($base64) % 4) % 4);
+        $base64 .= str_repeat(
+            '=',
+            (4 - strlen($base64) % 4) % 4
+        );
 
         $resultado = base64_decode($base64, true);
 

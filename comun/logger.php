@@ -1,5 +1,5 @@
-
 <?php
+
 class Logger
 {
     public static function info(string $mensaje): void //registra informacion sobre un evento normal

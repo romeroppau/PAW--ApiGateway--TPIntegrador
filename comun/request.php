@@ -18,23 +18,41 @@ class Request
         return $_GET; //PHP guarda los parámetros de la URL en $_GET, incluso cuando la petición HTTP usa otro método, como POST
     }
 
-    public static function json(): array //para poder leer el cuerpo JSON, por ejemplo de los datos del usuario que intenta iniciarse
-    { //Lee el contenido enviado en la solicitud, intenta interpretarlo como JSON 
+    public static function json(): array//para poder leer el cuerpo JSON, por ejemplo de los datos del usuario que intenta iniciarse
+    //Lee el contenido enviado en la solicitud, intenta interpretarlo como JSON 
     //y devuelve un array de PHP para que el módulo pueda trabajar con esos datos
+    {
+        // Lee el cuerpo de la solicitud HTTP.
         $body = file_get_contents('php://input');
-        if ($body === '') {
-            return [];
-        }
-        $data = json_decode($body, true);
-        if (!is_array($data)) {
-            Response::json([
-                'error' => 'El cuerpo de la solicitud no contiene un JSON válido'
-            ], 400);
 
+        if ($body === false) {
+            Response::error(
+                'No se pudo leer el cuerpo de la solicitud',
+                400
+            );
             exit;
         }
+
+        // Si no hay contenido, devuelve un array vacío.
+        if (trim($body) === '') {
+            return [];
+        }
+
+        // Intenta convertir el JSON a un array de PHP.
+        $data = json_decode($body, true);
+
+        // Rechaza JSON inválido o valores que no sean arrays.
+        if (json_last_error() !== JSON_ERROR_NONE || !is_array($data)) {
+            Response::error(
+                'El cuerpo de la solicitud no contiene un JSON válido',
+                400
+            );
+            exit;
+        }
+
         return $data;
     }
+
 
 }
 

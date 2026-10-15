@@ -1,4 +1,3 @@
-
 <?php
 
 class Validator
@@ -25,4 +24,19 @@ class Validator
     ): bool {
         return mb_strlen($valor, 'UTF-8') >= $minimo;
     }
+
+
+    public static function esTexto(array $datos, string $campo): bool
+    {
+        return isset($datos[$campo])
+            && is_string($datos[$campo]);
+    }
+
+    public static function longitudMaxima(
+        string $valor,
+        int $maximo
+    ): bool {
+        return mb_strlen($valor, 'UTF-8') <= $maximo;
+    }
+
 }
