@@ -1,0 +1,6 @@
+[submodule "Backend"]
+	path = Backend
+	url = https://github.com/romeroppau/PAW--Backend--TPIntegrador.git
+[submodule "Inventario"]
+	path = Inventario
+	url = https://github.com/romeroppau/PAW--Inventario--TPIntegrador.git
