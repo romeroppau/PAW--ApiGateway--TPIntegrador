@@ -13,12 +13,15 @@ WORKDIR /app
 COPY --chown=app:app comun/ /app/comun/
 COPY --chown=app:app docker/nginx.conf /etc/nginx/nginx.conf
 
+
 RUN mkdir -p /tmp/nginx/client_temp \
     /tmp/nginx/proxy_temp \
     /tmp/nginx/fastcgi_temp \
     /tmp/nginx/uwsgi_temp \
     /tmp/nginx/scgi_temp \
-    && chown -R app:app /tmp/nginx
+    && chown -R app:app /tmp/nginx \
+    && chmod -R 700 /tmp/nginx
+
 
 ENV PORT=10000
 
@@ -26,4 +29,4 @@ USER app
 
 EXPOSE 10000
 
-CMD ["sh", "-c", "php -S 127.0.0.1:9000 -t /app/comun /app/comun/index.php & exec nginx -g 'daemon off;'"]
+CMD ["sh", "-c", "mkdir -p /tmp/nginx/client_temp /tmp/nginx/proxy_temp /tmp/nginx/fastcgi_temp /tmp/nginx/uwsgi_temp /tmp/nginx/scgi_temp && php -S 127.0.0.1:9000 -t /app/comun /app/comun/index.php & exec nginx -g 'daemon off;'"]
