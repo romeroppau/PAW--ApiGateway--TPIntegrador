@@ -23,17 +23,17 @@ env \
   DB_PASSWORD="$BACKEND_DB_PASSWORD" \
   php $OPC \
   -S 127.0.0.1:9001 \
-  -t /app/Backend/public \
-  /app/Backend/public/index.php &
+  -t /app/Backend/src \
+  /app/Backend/src/Index.php &
 
 # Inventario: no recibe la clave privada JWT.
-env -u JWT_PRIVATE_KEY \
-  DB_USER="$INVENTARIO_DB_USER" \
-  DB_PASSWORD="$INVENTARIO_DB_PASSWORD" \
-  php $OPC \
-  -S 127.0.0.1:9002 \
-  -t /app/Inventario/public \
-  /app/Inventario/public/index.php &
+#env -u JWT_PRIVATE_KEY \
+#  DB_USER="$INVENTARIO_DB_USER" \
+#  DB_PASSWORD="$INVENTARIO_DB_PASSWORD" \
+#  php $OPC \
+#  -S 127.0.0.1:9002 \
+#  -t /app/Inventario/src \
+#  /app/Inventario/src/index.php &
 
 # Nginx tampoco debe heredar la clave privada.
 unset JWT_PRIVATE_KEY

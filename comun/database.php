@@ -12,6 +12,7 @@ class Database //esta clase se apoya en config.php. solamente pide los datos que
         }
 
         $host = Config::get('DB_HOST');
+        $puerto = Config::get('DB_PORT') ?: '3306';
         $nombre = Config::get('DB_NAME');
         $usuario = Config::get('DB_USER');
         $password = Config::get('DB_PASSWORD');
@@ -35,7 +36,7 @@ class Database //esta clase se apoya en config.php. solamente pide los datos que
             );
         }
 
-        $dsn = "mysql:host=$host;dbname=$nombre;charset=utf8mb4";
+        $dsn = "mysql:host=$host;port=$puerto;dbname=$nombre;charset=utf8mb4";
 
         self::$conexion = new PDO(
             $dsn,
