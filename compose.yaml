@@ -52,10 +52,8 @@ services:
       DB_PORT: "${DB_PORT:?Configura DB_PORT en .env}"
       DB_NAME: "${DB_NAME:?Configura DB_NAME en .env}"
       DB_SSL_CA: "${DB_SSL_CA:?Configura DB_SSL_CA en .env}"
-
       DB_ADMIN_USER: "${DB_ADMIN_USER:?Configura DB_ADMIN_USER en .env}"
       DB_ADMIN_PASSWORD: "${DB_ADMIN_PASSWORD:?Configura DB_ADMIN_PASSWORD en .env}"
-
       BACKEND_DB_PASSWORD: "${BACKEND_DB_PASSWORD:?Configura BACKEND_DB_PASSWORD en .env}"
       INVENTARIO_DB_PASSWORD: "${INVENTARIO_DB_PASSWORD:?Configura INVENTARIO_DB_PASSWORD en .env}"
     command: ["php", "/app/base/migrar.php"]
