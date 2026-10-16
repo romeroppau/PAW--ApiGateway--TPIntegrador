@@ -1,0 +1,8 @@
+.env
+.env.*
+!.env.example
+
+# Dependencias y archivos generados
+/vendor/
+/.DS_Store
+Thumbs.db

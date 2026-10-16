@@ -9,5 +9,5 @@
 -- backend puede leer, insertar y modificar; inventario solo leer.
 
 -- Tabla usuario (módulo Backend)
-GRANT SELECT, INSERT, UPDATE ON huellavet.usuario TO 'backend'@'%';
-GRANT SELECT                 ON huellavet.usuario TO 'inventario'@'%';
+GRANT SELECT, INSERT, UPDATE ON {{DB_NAME}}.usuario TO 'backend'@'%';
+GRANT SELECT                 ON {{DB_NAME}}.usuario TO 'inventario'@'%';

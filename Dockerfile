@@ -12,6 +12,10 @@ WORKDIR /app
 
 COPY --chown=app:app comun/ /app/comun/
 COPY --chown=app:app docker/nginx.conf /etc/nginx/nginx.conf
+COPY --chown=app:app Backend/ /app/Backend/
+COPY --chown=app:app Inventario/ /app/Inventario/
+COPY --chown=app:app docker/iniciar.sh /app/iniciar.sh
+COPY --chown=app:app base/ /app/base/
 
 
 RUN mkdir -p /tmp/nginx/client_temp \
@@ -22,6 +26,12 @@ RUN mkdir -p /tmp/nginx/client_temp \
     && chown -R app:app /tmp/nginx \
     && chmod -R 700 /tmp/nginx
 
+RUN printf '%s\n' \
+    'display_errors=Off' \
+    'display_startup_errors=Off' \
+    'log_errors=On' \
+    'error_log=/proc/self/fd/2' \
+    > /usr/local/etc/php/conf.d/99-security.ini
 
 ENV PORT=10000
 
@@ -29,4 +39,4 @@ USER app
 
 EXPOSE 10000
 
-CMD ["sh", "-c", "mkdir -p /tmp/nginx/client_temp /tmp/nginx/proxy_temp /tmp/nginx/fastcgi_temp /tmp/nginx/uwsgi_temp /tmp/nginx/scgi_temp && php -S 127.0.0.1:9000 -t /app/comun /app/comun/index.php & exec nginx -g 'daemon off;'"]
+CMD ["sh", "/app/iniciar.sh"]
