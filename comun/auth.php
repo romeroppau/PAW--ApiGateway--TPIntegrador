@@ -105,7 +105,7 @@ class Auth
         return $usuario;
     }
 
-    public static function verificarCsrf(array $usuario): void
+        public static function verificarCsrf(array $usuario): void
     {
         $metodo = Request::method();
 
@@ -113,26 +113,21 @@ class Auth
             return;
         }
 
-        /*
-         * PENDIENTE:
-         * El equipo debe definir cómo se obtiene el token CSRF
-         * esperado. El JWT acordado contiene id, rol y exp,
-         * por lo que no podemos obtenerlo de ese token.
-         *
-         * Hasta definir el mecanismo, no se permiten operaciones
-         * modificadoras que dependan de esta validación.
-         */
+        $tokenEnviado = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+        $tokenEsperado = $usuario['csrf'] ?? '';
 
-        Logger::error(
-            'Mecanismo CSRF pendiente de definición'
-        );
-
-        Response::error(
-            'No se puede verificar la protección CSRF',
-            403
-        );
-        exit;
+        if (
+            !is_string($tokenEnviado)
+            || !is_string($tokenEsperado)
+            || $tokenEnviado === ''
+            || $tokenEsperado === ''
+            || !hash_equals($tokenEsperado, $tokenEnviado)
+        ) {
+            Response::error('Token CSRF inválido', 403);
+            exit;
+        }
     }
+
 
     private static function decodificarJson(
         string $valor
