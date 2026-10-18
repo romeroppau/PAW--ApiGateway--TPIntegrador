@@ -1,0 +1,2 @@
+# Los scripts corren dentro de Linux (Docker): siempre con finales de línea LF, aunque se clonen en Windows.
+*.sh text eol=lf

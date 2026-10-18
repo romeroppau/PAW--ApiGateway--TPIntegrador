@@ -11,3 +11,9 @@
 -- Tabla usuario (módulo Backend)
 GRANT SELECT, INSERT, UPDATE ON {{DB_NAME}}.usuario TO 'backend'@'%';
 GRANT SELECT                 ON {{DB_NAME}}.usuario TO 'inventario'@'%';
+
+-- Tablas producto y movimiento_inventario (módulo Inventario)
+-- inventario lee, crea y modifica productos (la baja es lógica: UPDATE activo = 0, nunca DELETE).
+-- Los movimientos no se modifican ni se borran: son el historial del stock.
+GRANT SELECT, INSERT, UPDATE ON {{DB_NAME}}.producto              TO 'inventario'@'%';
+GRANT SELECT, INSERT         ON {{DB_NAME}}.movimiento_inventario TO 'inventario'@'%';
