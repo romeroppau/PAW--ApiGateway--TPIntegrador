@@ -15,24 +15,6 @@ Este repositorio reúne la configuración que permite ejecutar e integrar los m�
 
 El Gateway define las reglas de enrutamiento; cada módulo implementa sus propias operaciones y controles de autorización.
 
-## Arquitectura resumida
-
-```text
-Navegador / Frontend (Vercel)
-            |
-            | HTTPS: /api/...
-            v
-       Render / Nginx
-            |
-            +-- /api/gateway/*  -> Gateway (PHP común)
-            +-- /api/auth/*     -> Backend
-            +-- /api/tienda/*   -> Inventario (catálogo público)
-            +-- /api/inventario/* -> Inventario (operaciones administrativas)
-                                      |
-                                      v
-                                MySQL en Aiven
-```
-
 En el Frontend, `js/api.js` centraliza el uso de `fetch`. `vercel.json` reescribe las solicitudes `/api/...` al servicio público de Render para que el navegador use el mismo origen del sitio.
 
 ## Estructura principal
