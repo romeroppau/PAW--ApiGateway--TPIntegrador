@@ -28,7 +28,7 @@ Las demás variables (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_SSL_CA`, `JWT_PUBLIC_
 
 ## 2. Migración contra Aiven
 
-Crea las tablas `producto` y `movimiento_inventario` (`base/002_inventario_producto.sql`), crea el usuario `inventario` de MySQL con la contraseña del paso 1 y le da sus permisos (`base/permisos.sql`).
+Crea las tablas `producto` y `movimiento_inventario` (`base/002_inventario_producto.sql`), crea el usuario `inventario` de MySQL con la contraseña del paso 1 y le da sus permisos (`base/permisos/`).
 
 Se corre igual que cuando se creó la tabla `usuario`: desde la carpeta del ApiGateway, con el `.env` que apunta a Aiven y el `ca.pem` de Aiven.
 

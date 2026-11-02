@@ -9,7 +9,7 @@ Para desplegarlo en producción, ver [despliegue-inventario.md](./despliegue-inv
 | Archivo | Cambio |
 |---|---|
 | `base/002_inventario_producto.sql` | **Nuevo.** Migración que crea las tablas `producto` y `movimiento_inventario`, según el DER |
-| `base/permisos.sql` | Permisos del usuario `inventario` sobre sus tablas |
+| `base/permisos.sql` | Permisos del usuario `inventario` sobre sus tablas (desde la Entrega 4: `base/permisos/002_inventario_producto.sql`) |
 | `docker/iniciar.sh` | Se descomentó el bloque que levanta el módulo Inventario en el puerto 9002 |
 | `docker/nginx.conf` | `client_max_body_size 2m` en `/api/inventario/`, para las imágenes |
 | `Inventario` (submódulo) | Apunta al commit con el código del módulo |

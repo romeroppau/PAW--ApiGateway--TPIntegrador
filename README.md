@@ -11,6 +11,7 @@ Este repositorio reúne la configuración que permite ejecutar e integrar los m�
 - **PHP común (`comun/`):** ofrece herramientas compartidas para leer pedidos, responder JSON, leer variables de entorno, conectarse a MySQL, validar datos y registrar errores.
 - **Backend:** gestiona el registro y el inicio/cierre de sesión, los datos del usuario actual y la creación inicial de la cuenta de veterinario.
 - **Inventario:** es responsable del ABM de productos, el stock y los endpoints del catálogo. Su disponibilidad depende de que el módulo y su proceso estén integrados y levantados.
+- **Pacientes:** mascotas, turnos, consultas, facturas de consulta y calendario sanitario (Entrega 4). Corre en su propio proceso, con su propio usuario de MySQL.
 - **Base de datos:** las migraciones de `base/` crean la estructura y asignan permisos a las cuentas de los módulos.
 
 El Gateway define las reglas de enrutamiento; cada módulo implementa sus propias operaciones y controles de autorización.
@@ -23,11 +24,13 @@ En el Frontend, `js/api.js` centraliza el uso de `fetch`. `vercel.json` reescrib
 .
 ├── Backend/                     # Submódulo Git con el código de Backend
 ├── Inventario/                  # Submódulo Git con el código de Inventario
+├── Pacientes/                   # Submódulo Git con el código de Pacientes
 ├── api/CONTRATO_API_ApiGateway.md
 ├── base/
 │   ├── migrar.php               # Ejecuta migraciones SQL y asigna permisos
 │   ├── 001_backend_usuario.sql  # Crea la tabla usuario
-│   └── permisos.sql             # Permisos por módulo
+│   ├── 002_inventario_producto.sql
+│   └── permisos/                # Permisos por migración: un archivo NNN_*.sql por cada base/NNN_*.sql
 ├── comun/
 │   ├── index.php                # Entrada del proceso PHP del Gateway
 │   ├── router.php               # Ruteo de endpoints propios del Gateway
@@ -91,6 +94,8 @@ Variables principales:
 | `DB_SSL_CA` | Ruta **dentro del contenedor** al archivo CA que verifica el servidor MySQL. |
 | `BACKEND_DB_USER` / `BACKEND_DB_PASSWORD` | Credenciales de la cuenta limitada usada por Backend. |
 | `INVENTARIO_DB_USER` / `INVENTARIO_DB_PASSWORD` | Credenciales de la cuenta de Inventario. |
+| `PACIENTES_DB_USER` / `PACIENTES_DB_PASSWORD` | Credenciales de la cuenta de Pacientes. Si faltan en Render, Pacientes no se inicia (el resto sigue funcionando y queda un aviso en el log). |
+| `INTERNAL_TOKEN` | Token de las llamadas internas entre módulos (`/internal/`, por ejemplo Pacientes → Inventario para descontar stock). Solo lo reciben Inventario y Pacientes. Generarlo con `openssl rand -hex 32`. |
 | `DB_ADMIN_USER` / `DB_ADMIN_PASSWORD` | Cuenta con permisos suficientes para ejecutar las migraciones; no se usa para las peticiones habituales de la API. |
 | `JWT_PRIVATE_KEY` | Clave privada que usa Backend para firmar los JWT. No debe compartirse con Gateway ni Inventario. |
 | `JWT_PUBLIC_KEY` | Clave pública para verificar firmas JWT en los módulos que la necesiten. |
@@ -109,6 +114,9 @@ BACKEND_DB_USER=backend
 BACKEND_DB_PASSWORD=<CONTRASENA_BACKEND>
 INVENTARIO_DB_USER=inventario
 INVENTARIO_DB_PASSWORD=<CONTRASENA_INVENTARIO>
+PACIENTES_DB_USER=pacientes
+PACIENTES_DB_PASSWORD=<CONTRASENA_PACIENTES>
+INTERNAL_TOKEN=<TOKEN_INTERNO>
 DB_ADMIN_USER=avnadmin
 DB_ADMIN_PASSWORD=<CONTRASENA_ADMIN_AIVEN>
 JWT_PRIVATE_KEY=<CLAVE_PRIVADA_JWT>
@@ -188,7 +196,8 @@ Las migraciones se ejecutan manualmente cuando hay cambios de esquema; no se eje
 - Se conecta usando `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_ADMIN_USER`, `DB_ADMIN_PASSWORD` y `DB_SSL_CA`.
 - Crea/consulta la tabla `migracion` para registrar qué archivos `base/NNN_*.sql` ya se aplicaron.
 - Ejecuta las migraciones pendientes en orden.
-- Aplica los permisos definidos en `base/permisos.sql` y crea/actualiza las cuentas `backend` e `inventario` con las contraseñas indicadas.
+- Crea/actualiza las cuentas `backend`, `inventario` y `pacientes` con las contraseñas indicadas (`BACKEND_DB_PASSWORD`, `INVENTARIO_DB_PASSWORD` y `PACIENTES_DB_PASSWORD`). **Tienen que ser las mismas que están en Render:** el migrador se las vuelve a asignar cada vez.
+- Aplica los permisos de `base/permisos/`: un archivo por migración, con el mismo nombre (por ejemplo `base/permisos/003_inventario_insumo.sql` acompaña a `base/003_inventario_insumo.sql`). Cada rama agrega su propio archivo, así nadie edita un archivo de permisos compartido. Los permisos siguen la tabla "Permisos de MySQL por módulo" del DER.
 
 Para ejecutar el migrador con el perfil `tools`:
 
@@ -198,7 +207,7 @@ docker compose --profile tools run --rm migrator
 
 **Precaución:** verificá cuidadosamente `DB_HOST`, `DB_NAME` y `DB_ADMIN_USER` antes de ejecutarlo, porque el comando modifica la estructura y los permisos de la base a la que apunten las variables. En la configuración remota, la migración se aplica a Aiven; no asumas que se está usando MySQL local.
 
-Actualmente, `001_backend_usuario.sql` crea la tabla `usuario`. Las tablas de producto y movimientos de Inventario requieren sus propias migraciones y deben comprobarse aparte.
+Actualmente, `001_backend_usuario.sql` crea la tabla `usuario` y `002_inventario_producto.sql` las tablas `producto` y `movimiento_inventario`.
 
 ## Crear la cuenta inicial de veterinario
 
@@ -216,6 +225,8 @@ Reemplazá los datos de ejemplo. Evitá usar una contraseña real en comandos qu
 |---|---|---|
 | `GET` | `/api/gateway/salud` | Comprueba el Gateway. |
 | `GET` | `/api/backend/salud` | Comprueba el Backend y su conexión a la base. |
+| `GET` | `/api/inventario/salud` | Comprueba Inventario y su conexión a la base. |
+| `GET` | `/api/pacientes/salud` | Comprueba Pacientes y su conexión a la base. |
 | `POST` | `/api/auth/registro/cliente` | Registra un cliente. |
 | `POST` | `/api/auth/registro/rescatista` | Registra un rescatista. |
 | `POST` | `/api/auth/login` | Inicia sesión. |
@@ -239,6 +250,12 @@ Para Inventario:
 
 ```bash
 git submodule update --init --remote Inventario
+```
+
+Para Pacientes:
+
+```bash
+git submodule update --init --remote Pacientes
 ```
 
 Si el repositorio principal debe guardar la nueva versión utilizada, registrar la referencia del submódulo y subirla:
@@ -290,7 +307,7 @@ El Backend no pudo conectarse a la base. Verificá `DB_HOST`, `DB_PORT`, `DB_NAM
 
 **`500` al registrar un usuario**
 
-Revisá los logs de Render. La tabla `usuario` debe existir en la base configurada y la cuenta utilizada por Backend necesita los permisos definidos en `base/permisos.sql`. El mensaje que recibe el cliente es genérico a propósito.
+Revisá los logs de Render. La tabla `usuario` debe existir en la base configurada y la cuenta utilizada por Backend necesita los permisos definidos en `base/permisos/001_backend_usuario.sql`. El mensaje que recibe el cliente es genérico a propósito.
 
 **Catálogo vacío o error al consultar productos**
 
