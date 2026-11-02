@@ -14,6 +14,7 @@ COPY --chown=app:app comun/ /app/comun/
 COPY --chown=app:app docker/nginx.conf /etc/nginx/nginx.conf
 COPY --chown=app:app Backend/ /app/Backend/
 COPY --chown=app:app Inventario/ /app/Inventario/
+COPY --chown=app:app Pacientes/ /app/Pacientes/
 COPY --chown=app:app docker/iniciar.sh /app/iniciar.sh
 COPY --chown=app:app base/ /app/base/
 

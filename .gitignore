@@ -1,7 +1,9 @@
 .env
-ca.pem
 .env.*
 !.env.example
+
+# Certificados y claves: nunca se suben (ca.pem, ca-aiven.pem, claves JWT, etc.)
+*.pem
 
 # Dependencias y archivos generados
 /vendor/

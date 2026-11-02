@@ -4,3 +4,6 @@
 [submodule "Inventario"]
 	path = Inventario
 	url = https://github.com/romeroppau/PAW--Inventario--TPIntegrador.git
+[submodule "Pacientes"]
+	path = Pacientes
+	url = https://github.com/romeroppau/PAW--Pacientes--TPIntegrador.git
