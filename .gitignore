@@ -5,6 +5,9 @@
 # Certificados y claves: nunca se suben (ca.pem, ca-aiven.pem, claves JWT, etc.)
 *.pem
 
+# Archivos que genera pruebas/integracion.sh (certificados y claves descartables)
+.ci/
+
 # Dependencias y archivos generados
 /vendor/
 /.DS_Store
