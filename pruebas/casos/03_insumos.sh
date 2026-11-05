@@ -63,3 +63,9 @@ esperar "Dar de baja responde 204" 204
 
 pedir POST "/api/inventario/insumos/$NUEVO/stock" '{"cantidad":1}'
 esperar "No se puede cargar stock a un insumo dado de baja (409)" 409 '"El insumo está dado de baja"'
+
+pedir GET /api/inventario/insumos/movimientos
+esperar "Los movimientos de todos los insumos traen el nombre de cada insumo" 200 '"insumo":"Insumo de humo editado"'
+
+pedir GET "/api/inventario/insumos/movimientos?insumo=$NUEVO"
+esperar "El filtro por insumo trae los movimientos de ese insumo" 200 "\"insumo_id\":$NUEVO"
