@@ -30,6 +30,13 @@ ON DUPLICATE KEY UPDATE
 -- 101 y 102 son de hoy y están PROGRAMADO: los usa la consulta (rol 4).
 -- Los horarios son de las 8, para no chocar con los turnos que se carguen a mano en dev
 -- (un veterinario no puede tener dos turnos a la misma hora).
+
+-- Si las semillas se cargaron otro día, los turnos de prueba ya existen con otras fechas, y al
+-- moverlos chocarían entre sí (por ejemplo, el "de mañana" de ayer ocupa hoy a las 8:00, donde va
+-- el 101). Primero se marcan cancelados, que no ocupan horario; el INSERT de abajo les pone su
+-- fecha y su estado finales.
+UPDATE turno SET estado = 'CANCELADO' WHERE id IN (101, 102, 103, 104);
+
 INSERT INTO turno
   (id, mascota_id, veterinario_id, fecha, hora, motivo, estado)
 VALUES
