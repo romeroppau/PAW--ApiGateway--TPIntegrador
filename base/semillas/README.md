@@ -43,7 +43,7 @@ vence en 20 días (la fecha se calcula desde hoy cada vez que se cargan las semi
 | 105 | Vacuna triple felina (dosis) | 20 | $7.200 | Disponible |
 | 106 | Vacuna antirrábica (dosis) | 30 | $3.800 | Disponible |
 | 107 | Sutura absorbible 3-0 | 0 | $2.500 | En falta (sin stock, para probar ese error) |
-| 108 | Solución fisiológica 500 ml | 3 | $1.900 | Ya pedido |
+| 108 | Solución fisiológica 500 ml | 3 | $1.900 | Disponible (stock bajo: 10 o menos) |
 | 109 | Venda elástica 5 cm | 10 | $900 | Dado de baja (no aparece en los listados) |
 
 ## Mascotas
