@@ -58,3 +58,59 @@ pedir POST /api/pacientes/turnos/102/cancelar
 esperar "Un cliente no puede cancelar turnos (403)" 403
 
 cerrar_sesion
+
+# --- Etapa 3: alta de turnos (veterinaria) ---
+# Se pueden repetir contra dev: el turno de prueba se cancela al final y libera su horario.
+MANIANA=$(date -u -d '-3 hours +1 day' +%Y-%m-%d)   # mañana en Argentina (UTC-3)
+iniciar_sesion vet@prueba.huellavet 'Vet-Prueba-2026'
+
+pedir POST /api/pacientes/turnos '{"mascota_id":101,"fecha":"2020-01-01","hora":"25:00","motivo":"PELUQUERIA"}'
+esperar "Un turno con datos inválidos da 400 con el error de cada campo" 400 '"motivo"'
+
+pedir POST /api/pacientes/turnos "{\"mascota_id\":101,\"fecha\":\"$MANIANA\",\"hora\":\"19:45\",\"motivo\":\"CONSULTA\"}"
+esperar "La veterinaria carga un turno para mañana" 201 '"estado":"PROGRAMADO"'
+TURNO_NUEVO=$(printf '%s' "$RESPUESTA" | grep -o '"id":[0-9]*' | head -1 | cut -d: -f2)
+
+pedir POST /api/pacientes/turnos "{\"mascota_id\":102,\"fecha\":\"$MANIANA\",\"hora\":\"19:45\",\"motivo\":\"CONSULTA\"}"
+esperar "Otro turno a la misma hora da 409" 409
+
+pedir POST /api/pacientes/turnos "{\"mascota_id\":999999,\"fecha\":\"$MANIANA\",\"hora\":\"19:50\",\"motivo\":\"CONSULTA\"}"
+esperar "Un turno para una mascota que no existe da 404" 404
+
+pedir POST "/api/pacientes/turnos/${TURNO_NUEVO:-0}/cancelar"
+esperar "Cancelar el turno nuevo libera el horario" 200 '"estado":"CANCELADO"'
+
+# --- Etapa 3: alta, edición y baja de mascotas (cliente) ---
+cerrar_sesion
+iniciar_sesion cliente2@prueba.huellavet 'Cliente-Prueba-2026'
+
+pedir POST /api/pacientes/turnos "{\"mascota_id\":103,\"fecha\":\"$MANIANA\",\"hora\":\"19:55\",\"motivo\":\"CONSULTA\"}"
+esperar "Un cliente no puede cargar turnos (403)" 403
+
+pedir POST /api/pacientes/mascotas '{"nombre":"","especie":"PEZ","peso_kg":"-1"}'
+esperar "Una mascota con datos inválidos da 400 con el error de cada campo" 400 '"especie"'
+
+NACIMIENTO=$(date -u -d '-3 hours -3 weeks' +%Y-%m-%d)
+pedir POST /api/pacientes/mascotas "{\"nombre\":\"Cachorro de humo\",\"especie\":\"PERRO\",\"fecha_nacimiento\":\"$NACIMIENTO\"}"
+esperar "El cliente da de alta una mascota suya" 201 '"nombre":"Cachorro de humo"'
+MASCOTA_NUEVA=$(printf '%s' "$RESPUESTA" | grep -o '"id":[0-9]*' | head -1 | cut -d: -f2)
+
+pedir GET "/api/pacientes/mascotas/${MASCOTA_NUEVA:-0}/calendario-sanitario"
+esperar "Al darla de alta se le arma el calendario sanitario" 200 '"nombre":"Séxtuple (1.ª dosis)"'
+
+pedir PUT "/api/pacientes/mascotas/${MASCOTA_NUEVA:-0}" "{\"nombre\":\"Cachorro editado\",\"especie\":\"PERRO\",\"fecha_nacimiento\":\"$NACIMIENTO\",\"peso_kg\":4.5}"
+esperar "El cliente edita su mascota" 200 '"peso_kg":"4.50"'
+
+pedir PUT /api/pacientes/mascotas/101 '{"nombre":"Ajena","especie":"PERRO"}'
+esperar "Editar la mascota de otro cliente da 404" 404
+
+pedir DELETE /api/pacientes/mascotas/103
+esperar "No se puede dar de baja una mascota con turnos programados (409)" 409
+
+pedir DELETE "/api/pacientes/mascotas/${MASCOTA_NUEVA:-0}"
+esperar "El cliente da de baja su mascota" 204
+
+pedir PUT "/api/pacientes/mascotas/${MASCOTA_NUEVA:-0}" '{"nombre":"Otra vez","especie":"PERRO"}'
+esperar "Una mascota dada de baja ya no se edita (409)" 409
+
+cerrar_sesion
