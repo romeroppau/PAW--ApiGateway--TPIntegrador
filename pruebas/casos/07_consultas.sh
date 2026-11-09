@@ -62,7 +62,7 @@ pedir POST "/api/pacientes/consultas/$CONSULTA/insumos" '{"insumo_id":101,"canti
 esperar "Agregar el mismo insumo no puede pasar el tope de 100.000 en total" 400 'no puede superar'
 
 # --- Stock insuficiente: nada se finaliza ni se descuenta ---
-pedir POST "/api/pacientes/consultas/$CONSULTA/productos" '{"producto_id":101,"cantidad":100000}'
+pedir POST "/api/pacientes/consultas/$CONSULTA/productos" '{"producto_id":101,"cantidad":1000}'
 esperar "Agrega más unidades de las que hay en stock" 201 '"producto_id":101'
 ITEM=$(printf '%s' "$RESPUESTA" | sed -n 's/.*"productos":\[{"id":\([0-9]*\).*/\1/p')
 
