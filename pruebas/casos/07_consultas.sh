@@ -38,6 +38,9 @@ CSRF=$CSRF_REAL
 pedir PUT "/api/pacientes/consultas/$CONSULTA" '{"valor_base":-5}'
 esperar "Un valor base negativo da 400" 400
 
+pedir PUT "/api/pacientes/consultas/$CONSULTA" '{"valor_base":100000000}'
+esperar "Un valor base mayor al máximo da 400" 400
+
 pedir PUT "/api/pacientes/consultas/$CONSULTA" '{"diagnostico":"Control general","valor_base":8000}'
 esperar "La veterinaria guarda diagnóstico y valor base" 200 '"valor_base":"8000.00"'
 
