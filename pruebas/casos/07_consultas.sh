@@ -54,6 +54,10 @@ esperar "Agrega 2 jeringas" 201 '"cantidad":2'
 pedir POST "/api/pacientes/consultas/$CONSULTA/insumos" '{"insumo_id":101,"cantidad":1}'
 esperar "Agregar el mismo insumo suma la cantidad" 201 '"cantidad":3'
 
+# Ya hay 3 jeringas: 3 + 99.998 = 100.001, más que el tope de 100.000 por ítem (cuenta el total).
+pedir POST "/api/pacientes/consultas/$CONSULTA/insumos" '{"insumo_id":101,"cantidad":99998}'
+esperar "Agregar el mismo insumo no puede pasar el tope de 100.000 en total" 400 'no puede superar'
+
 # --- Stock insuficiente: nada se finaliza ni se descuenta ---
 pedir POST "/api/pacientes/consultas/$CONSULTA/productos" '{"producto_id":101,"cantidad":100000}'
 esperar "Agrega más unidades de las que hay en stock" 201 '"producto_id":101'
