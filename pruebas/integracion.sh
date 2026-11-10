@@ -124,7 +124,8 @@ compose --profile tools run --rm --build migrator
 
 if [ -f base/sembrar.php ]; then
   echo "=== Datos semilla"
-  compose --profile tools run --rm sembrador
+  # --build: la imagen copia base/semillas/; sin reconstruirla, se cargarían las semillas de la última vez.
+  compose --profile tools run --rm --build sembrador
 fi
 
 # --- 5. Comprobar que cada módulo responde ----------------------------------------------------

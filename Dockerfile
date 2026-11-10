@@ -28,6 +28,7 @@ RUN mkdir -p /tmp/nginx/client_temp \
     && chmod -R 700 /tmp/nginx
 
 RUN printf '%s\n' \
+    'expose_php=Off' \
     'display_errors=Off' \
     'display_startup_errors=Off' \
     'log_errors=On' \
