@@ -80,12 +80,41 @@ esperar "Un turno para una mascota que no existe da 404" 404
 pedir POST "/api/pacientes/turnos/${TURNO_NUEVO:-0}/cancelar"
 esperar "Cancelar el turno nuevo libera el horario" 200 '"estado":"CANCELADO"'
 
+# --- Entrega 5: reprogramar un turno (veterinaria) ---
+# Dos turnos de mañana a las 19:40 y 19:20; al final se cancelan los dos y liberan sus horarios.
+pedir POST /api/pacientes/turnos "{\"mascota_id\":101,\"fecha\":\"$MANIANA\",\"hora\":\"19:40\",\"motivo\":\"CONSULTA\"}"
+TURNO_A=$(printf '%s' "$RESPUESTA" | grep -o '"id":[0-9]*' | head -1 | cut -d: -f2)
+pedir POST /api/pacientes/turnos "{\"mascota_id\":102,\"fecha\":\"$MANIANA\",\"hora\":\"19:20\",\"motivo\":\"CONSULTA\"}"
+TURNO_B=$(printf '%s' "$RESPUESTA" | grep -o '"id":[0-9]*' | head -1 | cut -d: -f2)
+
+pedir POST "/api/pacientes/turnos/${TURNO_A:-0}/reprogramar" "{\"fecha\":\"$MANIANA\",\"hora\":\"19:25\"}"
+esperar "La veterinaria reprograma un turno" 200 '"hora":"19:25"'
+
+pedir POST "/api/pacientes/turnos/${TURNO_A:-0}/reprogramar" "{\"fecha\":\"$MANIANA\",\"hora\":\"19:20\"}"
+esperar "Reprogramar a una hora ocupada da 409 en el campo hora" 409 '"hora"'
+
+pedir POST "/api/pacientes/turnos/${TURNO_A:-0}/reprogramar" '{"fecha":"2999-01-01","hora":"03:00"}'
+esperar "Reprogramar fuera de fecha y de horario da 400 por campo" 400 '"fecha"'
+
+pedir POST /api/pacientes/turnos/999999/reprogramar "{\"fecha\":\"$MANIANA\",\"hora\":\"19:30\"}"
+esperar "Reprogramar un turno que no existe da 404" 404
+
+pedir POST "/api/pacientes/turnos/${TURNO_B:-0}/cancelar"
+pedir POST "/api/pacientes/turnos/${TURNO_B:-0}/reprogramar" "{\"fecha\":\"$MANIANA\",\"hora\":\"19:30\"}"
+esperar "Un turno cancelado no se reprograma (409)" 409
+
+pedir POST "/api/pacientes/turnos/${TURNO_A:-0}/cancelar"
+esperar "Se cancela el turno reprogramado" 200 '"estado":"CANCELADO"'
+
 # --- Etapa 3: alta, edición y baja de mascotas (cliente) ---
 cerrar_sesion
 iniciar_sesion cliente2@prueba.huellavet 'Cliente-Prueba-2026'
 
 pedir POST /api/pacientes/turnos "{\"mascota_id\":103,\"fecha\":\"$MANIANA\",\"hora\":\"19:55\",\"motivo\":\"CONSULTA\"}"
 esperar "Un cliente no puede cargar turnos (403)" 403
+
+pedir POST /api/pacientes/turnos/102/reprogramar "{\"fecha\":\"$MANIANA\",\"hora\":\"19:55\"}"
+esperar "Un cliente no puede reprogramar turnos (403)" 403
 
 pedir POST /api/pacientes/mascotas '{"nombre":"","especie":"PEZ","peso_kg":"-1"}'
 esperar "Una mascota con datos inválidos da 400 con el error de cada campo" 400 '"especie"'
@@ -100,6 +129,21 @@ esperar "Al darla de alta se le arma el calendario sanitario" 200 '"nombre":"Sé
 
 pedir PUT "/api/pacientes/mascotas/${MASCOTA_NUEVA:-0}" "{\"nombre\":\"Cachorro editado\",\"especie\":\"PERRO\",\"fecha_nacimiento\":\"$NACIMIENTO\",\"peso_kg\":4.5}"
 esperar "El cliente edita su mascota" 200 '"peso_kg":"4.50"'
+
+# Foto (Entrega 5): un PNG de 1 x 1 píxel.
+PNG='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='
+pedir PUT "/api/pacientes/mascotas/${MASCOTA_NUEVA:-0}" "{\"nombre\":\"Cachorro editado\",\"especie\":\"PERRO\",\"fecha_nacimiento\":\"$NACIMIENTO\",\"peso_kg\":4.5,\"foto\":\"$PNG\"}"
+esperar "El cliente le carga una foto a su mascota" 200 '"tiene_foto":true'
+
+# La foto es una imagen, no JSON: se mira el código y el tipo de la respuesta.
+read -r CODIGO RESPUESTA < <(curl --silent --max-time 60 -o /dev/null -w '%{http_code} %{content_type}'   -H "Cookie: huellavet_sesion=$SESION" "$BASE_URL/api/pacientes/mascotas/${MASCOTA_NUEVA:-0}/foto")
+esperar "La foto se sirve como imagen PNG" 200 'image/png'
+
+pedir PUT "/api/pacientes/mascotas/${MASCOTA_NUEVA:-0}" '{"nombre":"Cachorro editado","especie":"PERRO","foto":"data:image/png;base64,bm8gZXMgdW5hIGltYWdlbg=="}'
+esperar "Una foto que no es imagen da 400 en el campo foto" 400 '"foto"'
+
+pedir GET /api/pacientes/mascotas/101/foto
+esperar "La foto de la mascota de otro cliente da 404" 404
 
 pedir PUT /api/pacientes/mascotas/101 '{"nombre":"Ajena","especie":"PERRO"}'
 esperar "Editar la mascota de otro cliente da 404" 404
