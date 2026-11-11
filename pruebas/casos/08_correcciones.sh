@@ -67,4 +67,29 @@ esperar "Se corrige el valor base" 200 '"valor_base":"9000.00"'
 pedir POST "/api/pacientes/consultas/$CONSULTA/finalizar"
 esperar "Con el total corregido, finaliza" 200 '"numero":"C-'
 
+# --- Pendientes de la Entrega 4 ---
+# La salida de stock por la consulta queda con la hora de Argentina (el profesor la vio en UTC).
+AHORA=$(date -u -d '-3 hours' '+%Y-%m-%d %H')
+pedir GET /api/inventario/insumos/101/movimientos
+FECHA_SALIDA=$(printf '%s' "$RESPUESTA" | grep -o '"fecha":"[^"]*","tipo":"SALIDA","motivo":"CONSULTA"' | head -n1 | cut -d'"' -f4)
+RESPUESTA="salida de la consulta: $FECHA_SALIDA"
+esperar "La salida por la consulta tiene la hora de Argentina ($AHORA h)" 200 "$AHORA"
+
+# La factura con su detalle: la veterinaria ve todas; el cliente, solo las de sus mascotas.
+pedir GET "/api/pacientes/consultas/$CONSULTA/factura"
+esperar "La factura trae la mascota y los ítems para mostrarla" 200 '"mascota":{"id":103,"nombre":"Luna"}'
+esperar "y el detalle de la consulta con la jeringa" 200 '"insumo_id":101'
+
+cerrar_sesion
+iniciar_sesion cliente2@prueba.huellavet 'Cliente-Prueba-2026'
+pedir GET "/api/pacientes/consultas/$CONSULTA/factura"
+esperar "La dueña de Luna ve su factura" 200 '"numero":"C-'
+pedir GET /api/pacientes/consultas/101/factura
+esperar "y la de Tom, de las semillas" 200 '"nombre":"Tom"'
+cerrar_sesion
+
+iniciar_sesion cliente@prueba.huellavet 'Cliente-Prueba-2026'
+pedir GET "/api/pacientes/consultas/$CONSULTA/factura"
+esperar "La factura de la mascota de otro cliente da 404" 404
+
 cerrar_sesion
