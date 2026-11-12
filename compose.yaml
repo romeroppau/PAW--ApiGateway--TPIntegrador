@@ -62,6 +62,7 @@ services:
       BACKEND_DB_PASSWORD: "${BACKEND_DB_PASSWORD:?Configura BACKEND_DB_PASSWORD en .env}"
       INVENTARIO_DB_PASSWORD: "${INVENTARIO_DB_PASSWORD:?Configura INVENTARIO_DB_PASSWORD en .env}"
       PACIENTES_DB_PASSWORD: "${PACIENTES_DB_PASSWORD:?Configura PACIENTES_DB_PASSWORD en .env}"
+      ADOPCIONES_DB_PASSWORD: "${ADOPCIONES_DB_PASSWORD:?Configura ADOPCIONES_DB_PASSWORD en .env}"
     command: ["php", "/app/base/migrar.php"]
  
   sembrador:
