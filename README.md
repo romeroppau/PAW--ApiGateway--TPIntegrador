@@ -95,6 +95,7 @@ Variables principales:
 | `BACKEND_DB_USER` / `BACKEND_DB_PASSWORD` | Credenciales de la cuenta limitada usada por Backend. |
 | `INVENTARIO_DB_USER` / `INVENTARIO_DB_PASSWORD` | Credenciales de la cuenta de Inventario. |
 | `PACIENTES_DB_USER` / `PACIENTES_DB_PASSWORD` | Credenciales de la cuenta de Pacientes. Si faltan en Render, Pacientes no se inicia (el resto sigue funcionando y queda un aviso en el log). |
+| `ADOPCIONES_DB_USER` / `ADOPCIONES_DB_PASSWORD` | Credenciales de la cuenta de Adopciones (`adopciones`). El migrador necesita la contraseña para crear la cuenta (migración 007). |
 | `INTERNAL_TOKEN` | Token de las llamadas internas entre módulos (`/internal/`, por ejemplo Pacientes → Inventario para descontar stock). Solo lo reciben Inventario y Pacientes. Generarlo con `openssl rand -hex 32`. |
 | `DB_ADMIN_USER` / `DB_ADMIN_PASSWORD` | Cuenta con permisos suficientes para ejecutar las migraciones; no se usa para las peticiones habituales de la API. |
 | `JWT_PRIVATE_KEY` | Clave privada que usa Backend para firmar los JWT. No debe compartirse con Gateway ni Inventario. |
@@ -116,6 +117,8 @@ INVENTARIO_DB_USER=inventario
 INVENTARIO_DB_PASSWORD=<CONTRASENA_INVENTARIO>
 PACIENTES_DB_USER=pacientes
 PACIENTES_DB_PASSWORD=<CONTRASENA_PACIENTES>
+ADOPCIONES_DB_USER=adopciones
+ADOPCIONES_DB_PASSWORD=<CONTRASENA_ADOPCIONES>
 INTERNAL_TOKEN=<TOKEN_INTERNO>
 DB_ADMIN_USER=avnadmin
 DB_ADMIN_PASSWORD=<CONTRASENA_ADMIN_AIVEN>
@@ -196,7 +199,7 @@ Las migraciones se ejecutan manualmente cuando hay cambios de esquema; no se eje
 - Se conecta usando `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_ADMIN_USER`, `DB_ADMIN_PASSWORD` y `DB_SSL_CA`.
 - Crea/consulta la tabla `migracion` para registrar qué archivos `base/NNN_*.sql` ya se aplicaron.
 - Ejecuta las migraciones pendientes en orden.
-- Crea/actualiza las cuentas `backend`, `inventario` y `pacientes` con las contraseñas indicadas (`BACKEND_DB_PASSWORD`, `INVENTARIO_DB_PASSWORD` y `PACIENTES_DB_PASSWORD`). **Tienen que ser las mismas que están en Render:** el migrador se las vuelve a asignar cada vez.
+- Crea/actualiza las cuentas `backend`, `inventario`, `pacientes` y `adopciones` con las contraseñas indicadas (`BACKEND_DB_PASSWORD`, `INVENTARIO_DB_PASSWORD`, `PACIENTES_DB_PASSWORD` y `ADOPCIONES_DB_PASSWORD`). **Tienen que ser las mismas que están en Render:** el migrador se las vuelve a asignar cada vez.
 - Aplica los permisos de `base/permisos/`: un archivo por migración, con el mismo nombre (por ejemplo `base/permisos/003_inventario_insumo.sql` acompaña a `base/003_inventario_insumo.sql`). Cada rama agrega su propio archivo, así nadie edita un archivo de permisos compartido. Los permisos siguen la tabla "Permisos de MySQL por módulo" del DER.
 
 Para ejecutar el migrador con el perfil `tools`:

@@ -67,7 +67,8 @@ Todos con la veterinaria 101 (`vet@prueba.huellavet`). "Hoy" es la fecha de Arge
 | 104 | Ayer, 8:00 | 104 Tom | Consulta | Atendido | No se puede atender un turno ya atendido |
 
 Volver a cargar las semillas deja los turnos como en la tabla, aunque se hayan atendido o cancelado.
-No cargues a mano turnos de la veterinaria 101 a las 8:00 o 8:30 de esos días: chocarían con estos.
+No cargues a mano turnos de la veterinaria 101 a las 8:00 o 8:30 de esos días: chocarían con estos
+(tampoco a las 8:00 de hace 31 días: es el turno 901, el chequeo de la adopción de Simba).
 
 ## Calendario sanitario
 
@@ -96,6 +97,23 @@ Volver a cargar las semillas **borra las consultas de los turnos 101, 102 y 103*
 hicieron al probar), con sus ítems y su factura, y deja pendiente la vacuna que se haya aplicado
 en ellas. Así esos turnos se pueden atender de nuevo. Las consultas de prueba no mueven el stock:
 lo vuelven a dejar las semillas de productos e insumos.
+
+## Adopciones
+
+La rescatista 104 (`rescatista@`, aprobada) tiene tres mascotas a su cargo; la 105 (`rescatista2@`,
+pendiente) no tiene ninguna y no puede publicar. Las mascotas y el turno usan **ids desde 901**,
+porque en dev los ids 105 en adelante ya los usan las mascotas y los turnos que crea el humo.
+
+| Mascota | Dueño | Publicación | Adopción | Para qué |
+|---|---|---|---|---|
+| 901 Canela (perra, 1 año) | 104 (rescatista) | — | — | Publicar |
+| 902 Pipa (gata, 6 meses) | 104 (rescatista) | 101, aprobada | 101, con postulantes: la postulación 101 del cliente 102, pendiente | Postularse (el cliente 103), elegir, chequeo y completar |
+| 903 Rocco (perro, 2 años) | 104 (rescatista) | 102, pendiente de moderación | — | Aprobar o rechazar la publicación |
+| 904 Simba (gato, 1 año) | 103 (`cliente2@`) | 103, dada de baja | 103, finalizada **hace 30 días** (chequeo: turno 901, atendido) | El motor manda el control de los 30 días |
+
+Volver a cargar las semillas devuelve estas mascotas a su dueño y **borra lo que crearon las
+pruebas sobre ellas**: publicaciones, adopciones y postulaciones nuevas. Los chequeos que quedaron
+programados se cancelan. La foto de las publicaciones es un PNG de 1 x 1.
 
 ## Reglas para agregar semillas
 
