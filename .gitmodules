@@ -7,3 +7,6 @@
 [submodule "Pacientes"]
 	path = Pacientes
 	url = https://github.com/romeroppau/PAW--Pacientes--TPIntegrador.git
+[submodule "Adopciones"]
+	path = Adopciones
+	url = https://github.com/romeroppau/PAW--Adopciones--TPIntegrador.git

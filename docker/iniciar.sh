@@ -56,6 +56,23 @@ else
   echo "[AVISO] Pacientes no se inicia: falta Pacientes/src/index.php o PACIENTES_DB_USER/PACIENTES_DB_PASSWORD" >&2
 fi
 
+
+# Adopciones: no recibe la clave privada JWT ni el token interno.
+# Mismo criterio que Pacientes: si falta algo, avisa y sigue.
+if [ -f /app/Adopciones/src/index.php ] \
+  && [ -n "${ADOPCIONES_DB_USER:-}" ] \
+  && [ -n "${ADOPCIONES_DB_PASSWORD:-}" ]; then
+  env -u JWT_PRIVATE_KEY -u INTERNAL_TOKEN \
+    DB_USER="$ADOPCIONES_DB_USER" \
+    DB_PASSWORD="$ADOPCIONES_DB_PASSWORD" \
+    php $OPC \
+    -S 127.0.0.1:9004 \
+    -t /app/Adopciones/src \
+    /app/Adopciones/src/index.php &
+else
+  echo "[AVISO] Adopciones no se inicia: falta Adopciones/src/index.php o ADOPCIONES_DB_USER/ADOPCIONES_DB_PASSWORD" >&2
+fi
+
 # Nginx tampoco debe heredar la clave privada ni el token interno.
 unset JWT_PRIVATE_KEY INTERNAL_TOKEN
 
