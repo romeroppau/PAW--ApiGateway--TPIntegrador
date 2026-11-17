@@ -12,6 +12,7 @@ Este repositorio reúne la configuración que permite ejecutar e integrar los m�
 - **Backend:** gestiona el registro y el inicio/cierre de sesión, los datos del usuario actual y la creación inicial de la cuenta de veterinario.
 - **Inventario:** es responsable del ABM de productos, el stock y los endpoints del catálogo. Su disponibilidad depende de que el módulo y su proceso estén integrados y levantados.
 - **Pacientes:** mascotas, turnos, consultas, facturas de consulta y calendario sanitario (Entrega 4). Corre en su propio proceso, con su propio usuario de MySQL.
+- **Adopciones:** publicaciones de los rescatistas, moderación, postulaciones y cierre de la adopción (Entrega 5). Corre en su propio proceso (9004), con su propio usuario de MySQL.
 - **Base de datos:** las migraciones de `base/` crean la estructura y asignan permisos a las cuentas de los módulos.
 
 El Gateway define las reglas de enrutamiento; cada módulo implementa sus propias operaciones y controles de autorización.
@@ -25,6 +26,7 @@ En el Frontend, `js/api.js` centraliza el uso de `fetch`. `vercel.json` reescrib
 ├── Backend/                     # Submódulo Git con el código de Backend
 ├── Inventario/                  # Submódulo Git con el código de Inventario
 ├── Pacientes/                   # Submódulo Git con el código de Pacientes
+├── Adopciones/                  # Submódulo Git con el código de Adopciones
 ├── api/CONTRATO_API_ApiGateway.md
 ├── base/
 │   ├── migrar.php               # Ejecuta migraciones SQL y asigna permisos
@@ -95,8 +97,8 @@ Variables principales:
 | `BACKEND_DB_USER` / `BACKEND_DB_PASSWORD` | Credenciales de la cuenta limitada usada por Backend. |
 | `INVENTARIO_DB_USER` / `INVENTARIO_DB_PASSWORD` | Credenciales de la cuenta de Inventario. |
 | `PACIENTES_DB_USER` / `PACIENTES_DB_PASSWORD` | Credenciales de la cuenta de Pacientes. Si faltan en Render, Pacientes no se inicia (el resto sigue funcionando y queda un aviso en el log). |
-| `ADOPCIONES_DB_USER` / `ADOPCIONES_DB_PASSWORD` | Credenciales de la cuenta de Adopciones (`adopciones`). El migrador necesita la contraseña para crear la cuenta (migración 007). |
-| `INTERNAL_TOKEN` | Token de las llamadas internas entre módulos (`/internal/`, por ejemplo Pacientes → Inventario para descontar stock). Solo lo reciben Inventario y Pacientes. Generarlo con `openssl rand -hex 32`. |
+| `ADOPCIONES_DB_USER` / `ADOPCIONES_DB_PASSWORD` | Credenciales de la cuenta de Adopciones (`adopciones`). El migrador necesita la contraseña para crear la cuenta (migración 007). Si faltan en Render, Adopciones no se inicia (el resto sigue funcionando y queda un aviso en el log). |
+| `INTERNAL_TOKEN` | Token de las llamadas internas entre módulos (`/internal/`, por ejemplo Pacientes → Inventario para descontar stock y Adopciones → Pacientes para transferir la mascota). Lo reciben Inventario, Pacientes y Adopciones. Generarlo con `openssl rand -hex 32`. |
 | `DB_ADMIN_USER` / `DB_ADMIN_PASSWORD` | Cuenta con permisos suficientes para ejecutar las migraciones; no se usa para las peticiones habituales de la API. |
 | `JWT_PRIVATE_KEY` | Clave privada que usa Backend para firmar los JWT. No debe compartirse con Gateway ni Inventario. |
 | `JWT_PUBLIC_KEY` | Clave pública para verificar firmas JWT en los módulos que la necesiten. |
@@ -230,6 +232,7 @@ Reemplazá los datos de ejemplo. Evitá usar una contraseña real en comandos qu
 | `GET` | `/api/backend/salud` | Comprueba el Backend y su conexión a la base. |
 | `GET` | `/api/inventario/salud` | Comprueba Inventario y su conexión a la base. |
 | `GET` | `/api/pacientes/salud` | Comprueba Pacientes y su conexión a la base. |
+| `GET` | `/api/adopciones/salud` | Comprueba Adopciones y su conexión a la base. |
 | `POST` | `/api/auth/registro/cliente` | Registra un cliente. |
 | `POST` | `/api/auth/registro/rescatista` | Registra un rescatista. |
 | `POST` | `/api/auth/login` | Inicia sesión. |
@@ -259,6 +262,12 @@ Para Pacientes:
 
 ```bash
 git submodule update --init --remote Pacientes
+```
+
+Para Adopciones:
+
+```bash
+git submodule update --init --remote Adopciones
 ```
 
 Si el repositorio principal debe guardar la nueva versión utilizada, registrar la referencia del submódulo y subirla:

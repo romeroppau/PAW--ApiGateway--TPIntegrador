@@ -149,6 +149,7 @@ esperar_salud gateway
 [ -f Backend/src/Index.php ]      && esperar_salud backend
 [ -f Inventario/src/index.php ]   && esperar_salud inventario
 [ -f Pacientes/src/index.php ]    && esperar_salud pacientes
+[ -f Adopciones/src/index.php ]   && esperar_salud adopciones
 
 # --- 6. Pruebas de humo (si ya existen) -------------------------------------------------------
 if [ -f pruebas/humo.sh ]; then

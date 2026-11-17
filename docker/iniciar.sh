@@ -12,7 +12,8 @@ mkdir -p \
 OPC="-d display_errors=0 -d log_errors=1"
 
 # INTERNAL_TOKEN: token de las llamadas internas entre módulos (/internal/).
-# Solo lo reciben Inventario (lo verifica) y Pacientes (lo envía).
+# Lo reciben Inventario (lo verifica), Pacientes (lo envía a Inventario y lo verifica al transferir
+# una mascota) y Adopciones (lo envía a Pacientes al completar una adopción).
 
 # Gateway: no recibe la clave privada JWT ni el token interno.
 env -u JWT_PRIVATE_KEY -u INTERNAL_TOKEN php $OPC \
@@ -54,6 +55,21 @@ if [ -f /app/Pacientes/src/index.php ] \
     /app/Pacientes/src/index.php &
 else
   echo "[AVISO] Pacientes no se inicia: falta Pacientes/src/index.php o PACIENTES_DB_USER/PACIENTES_DB_PASSWORD" >&2
+fi
+
+# Adopciones (Entrega 5): no recibe la clave privada JWT. Arranca condicionado, igual que Pacientes.
+if [ -f /app/Adopciones/src/index.php ] \
+  && [ -n "${ADOPCIONES_DB_USER:-}" ] \
+  && [ -n "${ADOPCIONES_DB_PASSWORD:-}" ]; then
+  env -u JWT_PRIVATE_KEY \
+    DB_USER="$ADOPCIONES_DB_USER" \
+    DB_PASSWORD="$ADOPCIONES_DB_PASSWORD" \
+    php $OPC \
+    -S 127.0.0.1:9004 \
+    -t /app/Adopciones/src \
+    /app/Adopciones/src/index.php &
+else
+  echo "[AVISO] Adopciones no se inicia: falta Adopciones/src/index.php o ADOPCIONES_DB_USER/ADOPCIONES_DB_PASSWORD" >&2
 fi
 
 # Nginx tampoco debe heredar la clave privada ni el token interno.

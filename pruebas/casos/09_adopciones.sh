@@ -1,7 +1,14 @@
 # shellcheck shell=bash
 # Casos del circuito de adopción (rol 3). Contrato: docs/api/contrato-adopciones.md del repo
 # Adopciones. Datos: base/semillas/README.md, sección "Adopciones" (rescatista@ aprobada,
-# rescatista2@ pendiente). Volver a sembrar deja todo como al principio.
+# rescatista2@ pendiente). Volver a sembrar deja todo como al principio: en dev, el circuito
+# completo (Pipa pasa al cliente 103) solo se puede repetir después de sembrar de nuevo.
+
+# Foto de prueba (PNG de 1 x 1), la misma de las semillas.
+PNG_PRUEBA='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+
+# primer_id: el primer "id" numérico de la última respuesta (el del objeto principal).
+primer_id() { printf '%s' "$RESPUESTA" | grep -o '"id":[0-9]*' | head -1 | cut -d: -f2; }
 
 # --- Validación de rescatistas (Backend) ---
 cerrar_sesion
@@ -15,6 +22,13 @@ CODIGO=$(curl --silent --max-time 60 -o /dev/null -w '%{http_code}' -X POST \
   --data '{"duenio_actual_id":104,"nuevo_duenio_id":103}' "$BASE_URL/internal/mascotas/902/transferir")
 RESPUESTA=""
 esperar "La transferencia de la mascota no se puede llamar desde afuera (404)" 404
+
+pedir GET /api/adopciones/publicaciones
+esperar "Cualquiera ve los animales disponibles" 200 '"publicaciones":'
+pedir GET '/api/adopciones/publicaciones?especie=PEZ'
+esperar "Una especie que no existe da 400" 400
+pedir GET /api/adopciones/moderacion
+esperar "Sin sesión no se ve la moderación (401)" 401
 
 es_entorno_de_prueba || return 0
 
@@ -32,6 +46,8 @@ pedir GET /api/auth/yo
 esperar "La rescatista pendiente ve su estado en la sesión" 200 '"estado_validacion":"PENDIENTE"'
 pedir POST /api/rescatistas/105/aprobar
 esperar "Una rescatista no se aprueba a sí misma (403)" 403
+pedir POST /api/adopciones/publicaciones "{\"mascota_id\":901,\"titulo\":\"Canela\",\"descripcion\":\"Una perra muy buena\",\"foto\":\"$PNG_PRUEBA\"}"
+esperar "Una rescatista pendiente no puede publicar (403)" 403 'todavía no fue aprobada'
 
 iniciar_sesion vet@prueba.huellavet 'Vet-Prueba-2026'
 pedir GET /api/rescatistas
@@ -88,5 +104,136 @@ esperar "La rescatista da de baja la mascota que cargó" 204
 iniciar_sesion rescatista2@prueba.huellavet 'Rescatista-Prueba-2026'
 pedir GET /api/pacientes/mascotas/902
 esperar "Otra rescatista no ve las mascotas de la primera (404)" 404
+pedir GET /api/adopciones/101/postulaciones
+esperar "Ni los postulantes de sus adopciones (404)" 404
+
+# --- Publicar (Adopciones) ---
+iniciar_sesion rescatista@prueba.huellavet 'Rescatista-Prueba-2026'
+CANELA="{\"mascota_id\":901,\"titulo\":\"Canela busca familia\",\"descripcion\":\"Perra de un a\u00f1o, mansa y juguetona.\",\"foto\":\"$PNG_PRUEBA\"}"
+pedir POST /api/adopciones/publicaciones "$CANELA"
+esperar "La rescatista publica a Canela" 201 '"estado_moderacion":"PENDIENTE"'
+PUBLICACION_CANELA=$(primer_id)
+pedir POST /api/adopciones/publicaciones "$CANELA"
+esperar "Canela no se publica dos veces (409)" 409 'ya tiene una publicación abierta'
+pedir POST /api/adopciones/publicaciones "{\"mascota_id\":101,\"titulo\":\"Firulais\",\"descripcion\":\"No es de la rescatista\",\"foto\":\"$PNG_PRUEBA\"}"
+esperar "No publica una mascota que no tiene a cargo (400)" 400 '"mascota_id"'
+pedir POST /api/adopciones/publicaciones '{"mascota_id":901,"titulo":"Canela","descripcion":"Una perra muy buena","foto":"data:image/png;base64,AAAA"}'
+esperar "Una foto que no es una imagen da 400" 400 '"foto"'
+pedir GET /api/adopciones/mis-publicaciones
+esperar "La rescatista ve sus publicaciones" 200 '"titulo":"Canela busca familia"'
+pedir GET /api/adopciones/moderacion
+esperar "La rescatista no modera (403)" 403
+
+cerrar_sesion
+pedir GET "/api/adopciones/publicaciones/${PUBLICACION_CANELA:-0}"
+esperar "Una publicación sin aprobar no es pública (404)" 404
+pedir GET /api/adopciones/publicaciones/101/foto
+esperar "La foto de una publicación disponible es pública" 200
+
+# --- Moderar (veterinaria) ---
+iniciar_sesion vet@prueba.huellavet 'Vet-Prueba-2026'
+pedir GET /api/adopciones/moderacion
+esperar "La veterinaria ve las publicaciones por moderar" 200 '"titulo":"Canela busca familia"'
+pedir POST /api/adopciones/publicaciones/102/rechazar '{"motivo":""}'
+esperar "Rechazar sin motivo da 400" 400 '"motivo"'
+pedir POST /api/adopciones/publicaciones/102/rechazar '{"motivo":"La foto no se ve bien"}'
+esperar "La veterinaria rechaza la publicación de Rocco" 200 '"motivo_rechazo":"La foto no se ve bien"'
+pedir POST "/api/adopciones/publicaciones/${PUBLICACION_CANELA:-0}/aprobar"
+esperar "La veterinaria aprueba la de Canela: se abre la adopción" 200 '"estado":"PUBLICADA"'
+ADOPCION_CANELA=$(printf '%s' "$RESPUESTA" | grep -o '"adopcion":{"id":[0-9]*' | grep -o '[0-9]*$')
+pedir POST "/api/adopciones/publicaciones/${PUBLICACION_CANELA:-0}/aprobar"
+esperar "La moderación es una sola (409)" 409
+
+cerrar_sesion
+pedir GET /api/adopciones/publicaciones
+esperar "Canela ya aparece entre los disponibles" 200 '"nombre":"Canela"'
+pedir GET '/api/adopciones/publicaciones?especie=GATO'
+esperar "Filtrando por gatos aparece Pipa" 200 '"nombre":"Pipa"'
+pedir GET /api/adopciones/publicaciones/102
+esperar "Rocco, rechazado, no es público (404)" 404
+
+# --- Postularse (cliente) ---
+POSTULACION='{"tipo_vivienda":"Departamento","otras_mascotas":"Ninguna","tiempo_disponible":"Toda la tarde"}'
+pedir POST /api/adopciones/101/postulaciones "$POSTULACION"
+esperar "Sin sesión no se postula (401)" 401
+iniciar_sesion cliente2@prueba.huellavet 'Cliente-Prueba-2026'
+pedir POST /api/adopciones/101/postulaciones '{"tipo_vivienda":"","otras_mascotas":"Ninguna","tiempo_disponible":"Toda la tarde"}'
+esperar "Una postulación incompleta da 400" 400 '"tipo_vivienda"'
+pedir POST /api/adopciones/101/postulaciones "$POSTULACION"
+esperar "El cliente 103 se postula a Pipa" 201 '"estado":"PENDIENTE"'
+POSTULACION_CLIENTE2=$(primer_id)
+pedir POST /api/adopciones/101/postulaciones "$POSTULACION"
+esperar "No se postula dos veces (409)" 409 'Ya te postulaste'
+pedir GET /api/adopciones/mis-postulaciones
+esperar "El cliente ve sus postulaciones" 200 '"titulo":"Pipa busca familia"'
+pedir POST /api/adopciones/101/completar
+esperar "Un cliente no completa adopciones (403)" 403
+
+# --- Elegir al adoptante (rescatista) ---
+iniciar_sesion rescatista@prueba.huellavet 'Rescatista-Prueba-2026'
+pedir GET /api/adopciones/101/postulaciones
+esperar "La rescatista ve los postulantes de Pipa, sin su teléfono" 200 '"telefono":null'
+pedir POST /api/adopciones/101/elegir '{}'
+esperar "Elegir sin postulación da 400" 400
+pedir POST /api/adopciones/101/elegir "{\"postulacion_id\":${POSTULACION_CLIENTE2:-0}}"
+esperar "La rescatista elige al cliente 103" 200 '"estado":"ADOPTANTE_ELEGIDO"'
+esperar "Y la otra postulación queda rechazada" 200 '"estado":"RECHAZADA"'
+pedir POST /api/adopciones/101/elegir "{\"postulacion_id\":${POSTULACION_CLIENTE2:-0}}"
+esperar "No se elige dos veces (409)" 409
+
+# --- Chequeo y cierre (veterinaria) ---
+iniciar_sesion vet@prueba.huellavet 'Vet-Prueba-2026'
+pedir POST /api/adopciones/101/completar
+esperar "Sin chequeo no se completa (409)" 409
+pedir POST /api/adopciones/101/chequeo '{"turno_id":101}'
+esperar "Un turno que no es de chequeo no sirve (400)" 400 'no es un chequeo de adopción'
+
+# El chequeo es un turno común de hoy. Se prueba con varios horarios: en dev, las corridas
+# anteriores pueden haber ocupado alguno.
+HOY=$(date -u -d '3 hours ago' +%F)
+for HORA in 19:50 19:40 19:30 19:20 19:10 19:00 18:50 18:40 18:30 18:20; do
+  pedir POST /api/pacientes/turnos "{\"mascota_id\":902,\"fecha\":\"$HOY\",\"hora\":\"$HORA\",\"motivo\":\"CHEQUEO_ADOPCION\"}"
+  [ "$CODIGO" = 201 ] && break
+done
+esperar "La veterinaria carga el turno de chequeo de Pipa" 201 '"CHEQUEO_ADOPCION"'
+TURNO_CHEQUEO=$(primer_id)
+
+pedir POST /api/adopciones/101/chequeo "{\"turno_id\":${TURNO_CHEQUEO:-0}}"
+esperar "Y lo asocia a la adopción" 200 '"estado":"CHEQUEO_PENDIENTE"'
+pedir POST /api/adopciones/101/completar
+esperar "Con el chequeo sin atender no se completa (409)" 409 'todavía no se atendió'
+
+pedir POST "/api/pacientes/turnos/${TURNO_CHEQUEO:-0}/atencion"
+esperar "La veterinaria atiende el chequeo" 201
+CONSULTA_CHEQUEO=$(primer_id)
+pedir PUT "/api/pacientes/consultas/${CONSULTA_CHEQUEO:-0}" '{"diagnostico":"Chequeo de adopci\u00f3n: sana y lista para su familia"}'
+esperar "Carga el diagnóstico" 200
+pedir POST "/api/pacientes/consultas/${CONSULTA_CHEQUEO:-0}/finalizar"
+esperar "Y termina la consulta" 200
+
+pedir POST /api/adopciones/101/completar
+esperar "La veterinaria completa la adopción" 200 '"estado":"FINALIZADA"'
+pedir POST /api/adopciones/101/completar
+esperar "No se completa dos veces (409)" 409
+pedir GET '/api/adopciones?estado=FINALIZADA'
+esperar "La adopción aparece entre las finalizadas" 200 '"nombre":"Pipa"'
+
+# Pipa ahora es del adoptante, con su historial.
+iniciar_sesion cliente2@prueba.huellavet 'Cliente-Prueba-2026'
+pedir GET /api/pacientes/mascotas/902
+esperar "Pipa pasó a ser del cliente 103" 200 '"nombre":"Pipa"'
+pedir GET /api/pacientes/mascotas/902/historial
+esperar "Con el chequeo en su historial" 200 'Chequeo de adopción'
+iniciar_sesion rescatista@prueba.huellavet 'Rescatista-Prueba-2026'
+pedir GET /api/pacientes/mascotas/902
+esperar "La rescatista ya no tiene a Pipa (404)" 404
+
+# --- Cancelar ---
+pedir POST "/api/adopciones/${ADOPCION_CANELA:-0}/cancelar"
+esperar "La rescatista cancela la adopción de Canela" 200 '"estado":"CANCELADA"'
+pedir POST "/api/adopciones/${ADOPCION_CANELA:-0}/cancelar"
+esperar "Una adopción terminada no se cancela (409)" 409
+pedir GET /api/pacientes/mascotas/901
+esperar "Canela sigue a cargo de la rescatista" 200 '"nombre":"Canela"'
 
 cerrar_sesion
