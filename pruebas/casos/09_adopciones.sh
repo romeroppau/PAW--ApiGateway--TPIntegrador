@@ -236,4 +236,40 @@ esperar "Una adopción terminada no se cancela (409)" 409
 pedir GET /api/pacientes/mascotas/901
 esperar "Canela sigue a cargo de la rescatista" 200 '"nombre":"Canela"'
 
+# --- Editar y dar de baja publicaciones ---
+pedir PUT /api/adopciones/publicaciones/102 '{"titulo":"ab"}'
+esperar "Editar con un título muy corto da 400" 400 '"titulo"'
+pedir PUT /api/adopciones/publicaciones/102 "{\"descripcion\":\"Perro de 2 a\u00f1os, tranquilo. Ahora con una foto mejor.\",\"foto\":\"$PNG_PRUEBA\"}"
+esperar "La rescatista edita la publicación rechazada de Rocco: vuelve a revisión" 200 '"estado_moderacion":"PENDIENTE"'
+esperar "Y se borra el motivo del rechazo" 200 '"motivo_rechazo":null'
+pedir PUT "/api/adopciones/publicaciones/${PUBLICACION_CANELA:-0}" '{"titulo":"Canela"}'
+esperar "Una publicación cerrada no se edita (409)" 409
+
+pedir POST /api/adopciones/publicaciones "$CANELA"
+esperar "Canela se puede volver a publicar después de cancelar" 201
+PUBLICACION_CANELA2=$(primer_id)
+
+iniciar_sesion rescatista2@prueba.huellavet 'Rescatista-Prueba-2026'
+pedir PUT /api/adopciones/publicaciones/102 '{"titulo":"Rocco"}'
+esperar "Otra rescatista no edita la publicación (404)" 404
+pedir DELETE /api/adopciones/publicaciones/102
+esperar "Ni la da de baja (404)" 404
+
+iniciar_sesion vet@prueba.huellavet 'Vet-Prueba-2026'
+pedir POST "/api/adopciones/publicaciones/${PUBLICACION_CANELA2:-0}/aprobar"
+esperar "La veterinaria aprueba la nueva publicación de Canela" 200 '"estado":"PUBLICADA"'
+ADOPCION_CANELA2=$(printf '%s' "$RESPUESTA" | grep -o '"adopcion":{"id":[0-9]*' | grep -o '[0-9]*$')
+pedir DELETE /api/adopciones/publicaciones/102
+esperar "La veterinaria no da de baja publicaciones (403)" 403
+
+iniciar_sesion rescatista@prueba.huellavet 'Rescatista-Prueba-2026'
+pedir DELETE "/api/adopciones/publicaciones/${PUBLICACION_CANELA2:-0}"
+esperar "La rescatista da de baja la publicación de Canela" 204
+pedir GET "/api/adopciones/${ADOPCION_CANELA2:-0}/postulaciones"
+esperar "Y su adopción queda cancelada" 200 '"estado":"CANCELADA"'
+pedir DELETE "/api/adopciones/publicaciones/${PUBLICACION_CANELA2:-0}"
+esperar "No se da de baja dos veces (409)" 409
+pedir DELETE /api/adopciones/publicaciones/102
+esperar "La rescatista da de baja la de Rocco, que estaba en revisión" 204
+
 cerrar_sesion
