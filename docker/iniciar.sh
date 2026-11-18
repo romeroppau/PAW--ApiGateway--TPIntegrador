@@ -14,8 +14,9 @@ OPC="-d display_errors=0 -d log_errors=1"
 # Lo reciben Inventario y Pacientes (stock), Backend (notificaciones) y Adopciones/Reportes (que llaman).
 # El Gateway y Nginx no lo reciben.
 # WHATSAPP_TOKEN: solo lo recibe Backend (envía los avisos por WhatsApp).
-# TAREAS_TOKEN: lo reciben Backend y Inventario, que atienden las tareas programadas
-# (Inventario: POST /api/tienda/tareas/vencer, vencimientos y recordatorios de la tienda).
+# TAREAS_TOKEN: lo reciben Backend, Inventario y Reportes, que atienden las tareas programadas
+# (Inventario: POST /api/tienda/tareas/vencer, vencimientos y recordatorios de la tienda;
+# Reportes: POST /api/reportes/tareas/diaria, el motor de avisos).
 # MP_ACCESS_TOKEN y MP_WEBHOOK_SECRET (Mercado Pago): solo los recibe Inventario (cobra la tienda).
 
 # Gateway: no recibe la clave privada JWT, el token interno ni los de WhatsApp y tareas.
@@ -76,6 +77,15 @@ if [ -f /app/Adopciones/src/index.php ] \
     /app/Adopciones/src/index.php &
 else
   echo "[AVISO] Adopciones no se inicia: falta Adopciones/src/index.php o ADOPCIONES_DB_USER/ADOPCIONES_DB_PASSWORD" >&2
+fi
+
+# Reportes (Entrega 5): motor de avisos y reportes. Recibe INTERNAL_TOKEN (pide los avisos a Backend)
+# y TAREAS_TOKEN (su tarea diaria); no recibe la clave privada JWT ni los de WhatsApp y Mercado Pago.
+# Arranca condicionado, igual que Pacientes y Adopciones.
+if [ -f /app/Reportes/src/index.php ]   && [ -n "${REPORTES_DB_USER:-}" ]   && [ -n "${REPORTES_DB_PASSWORD:-}" ]; then
+  env -u JWT_PRIVATE_KEY -u WHATSAPP_TOKEN -u MP_ACCESS_TOKEN -u MP_WEBHOOK_SECRET     DB_USER="$REPORTES_DB_USER"     DB_PASSWORD="$REPORTES_DB_PASSWORD"     php $OPC     -S 127.0.0.1:9005     -t /app/Reportes/src     /app/Reportes/src/index.php &
+else
+  echo "[AVISO] Reportes no se inicia: falta Reportes/src/index.php o REPORTES_DB_USER/REPORTES_DB_PASSWORD" >&2
 fi
 
 # Nginx tampoco debe heredar la clave privada ni los tokens.
