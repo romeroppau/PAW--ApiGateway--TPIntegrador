@@ -120,13 +120,12 @@ cerrar_sesion
 iniciar_sesion cliente@prueba.huellavet 'Cliente-Prueba-2026'
 pedir POST "/api/tienda/compras/$NUMERO/cancelar"
 esperar "Arrepentirse antes de pagar cancela la compra" 200 '"estado":"CANCELADA"'
+esperar "  con el motivo: la canceló el comprador" 200 '"motivo_cancelacion":"COMPRADOR"'
 stock_de 101
 [ "$STOCK" -eq "$ANTES" ] && echo "  ok     Al cancelar, el stock vuelve ($STOCK)" || { echo "  FALLA  el stock no volvió ($STOCK, esperaba $ANTES)"; FALLAS=$((FALLAS+1)); }
 TOTAL=$((TOTAL+1))
 pedir POST "/api/tienda/compras/$NUMERO/cancelar"
 esperar "Una compra cancelada no se vuelve a cancelar (409)" 409 '"La compra ya está cancelada"'
-pedir POST /api/tienda/compras/V-000101/cancelar
-esperar "Una compra pagada no se cancela: no hay devoluciones (409)" 409 'ya está pagada'
 cerrar_sesion
 
 # --- Dos compradores quieren lo último: el segundo no puede confirmar ---
@@ -209,10 +208,38 @@ cerrar_sesion
 iniciar_sesion rescatista@prueba.huellavet 'Rescatista-Prueba-2026'
 pedir GET /api/tienda/compras/V-000100
 esperar "Sin pagar en 15 minutos, la compra se cancela sola" 200 '"estado":"CANCELADA"'
+esperar "  con el motivo: no se pagó a tiempo" 200 '"motivo_cancelacion":"SIN_PAGO"'
 cerrar_sesion
 stock_de 105
 [ "$STOCK" = 30 ] && echo "  ok     y el stock reservado vuelve (30)" || { echo "  FALLA  el stock de los snacks es $STOCK, esperaba 30"; FALLAS=$((FALLAS+1)); }
 TOTAL=$((TOTAL+1))
+
+# --- El comprador cancela un pedido ya pagado (V-000099 de las semillas): sin devolución ---
+stock_de 113; ANTES=$STOCK
+iniciar_sesion cliente2@prueba.huellavet 'Cliente-Prueba-2026'
+pedir POST /api/tienda/compras/V-000099/cancelar
+esperar "El comprador cancela un pedido pagado" 200 '"estado":"CANCELADA"'
+esperar "  con el motivo: la canceló el comprador" 200 '"motivo_cancelacion":"COMPRADOR"'
+pedir GET /api/notificaciones
+esperar "  y le llega el aviso de que el importe no se reintegra" 200 'Cancelaste tu pedido V-000099'
+pedir POST /api/tienda/compras/V-000099/cancelar
+esperar "No se cancela dos veces (409)" 409 '"La compra ya está cancelada"'
+cerrar_sesion
+stock_de 113
+[ "$STOCK" -eq $((ANTES + 1)) ] && echo "  ok     el stock de la correa vuelve ($ANTES -> $STOCK)" || { echo "  FALLA  el stock no volvió ($ANTES -> $STOCK)"; FALLAS=$((FALLAS+1)); }
+TOTAL=$((TOTAL+1))
+
+iniciar_sesion rescatista@prueba.huellavet 'Rescatista-Prueba-2026'
+pedir POST /api/tienda/compras/V-000102/cancelar
+esperar "Un pedido ya entregado no se cancela (409)" 409 'ya se entregó'
+cerrar_sesion
+
+iniciar_sesion vet@prueba.huellavet 'Vet-Prueba-2026'
+pedir GET '/api/inventario/compras?estado=CANCELADA'
+esperar "La veterinaria ve los cancelados con su motivo" 200 '"numero":"V-000099"'
+esperar "  (cancelado por el comprador)" 200 '"motivo_cancelacion":"COMPRADOR"'
+esperar "  (vencido)" 200 '"motivo_cancelacion":"VENCIDA"'
+cerrar_sesion
 
 # --- Tarea de vencimientos (GitHub Actions) ---
 pedir POST /api/tienda/tareas/vencer
