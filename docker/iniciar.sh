@@ -12,8 +12,8 @@ mkdir -p \
 OPC="-d display_errors=0 -d log_errors=1"
 
 # INTERNAL_TOKEN: token de las llamadas internas entre módulos (/internal/).
-# Lo reciben Inventario (lo verifica), Pacientes (lo envía a Inventario y lo verifica al transferir
-# una mascota) y Adopciones (lo envía a Pacientes al completar una adopción).
+# Lo reciben Inventario y Pacientes (stock), Backend (notificaciones) y Adopciones/Reportes (que llaman).
+# El Gateway y Nginx no lo reciben.
 
 # Gateway: no recibe la clave privada JWT ni el token interno.
 env -u JWT_PRIVATE_KEY -u INTERNAL_TOKEN php $OPC \
