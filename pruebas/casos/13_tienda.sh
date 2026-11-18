@@ -241,6 +241,67 @@ esperar "  (cancelado por el comprador)" 200 '"motivo_cancelacion":"COMPRADOR"'
 esperar "  (vencido)" 200 '"motivo_cancelacion":"VENCIDA"'
 cerrar_sesion
 
+# --- Pago (simulado: en GitHub y en local no hay Mercado Pago) ---
+numero_de() { printf '%s' "$RESPUESTA" | grep -o '"numero":"V-[0-9]*"' | head -1 | cut -d'"' -f4; }
+
+iniciar_sesion rescatista@prueba.huellavet 'Rescatista-Prueba-2026'
+pedir POST /api/tienda/carrito/items '{"producto_id":109,"cantidad":1}'
+pedir POST /api/tienda/carrito/confirmar
+PAGO=$(numero_de)
+pedir POST "/api/tienda/compras/$PAGO/pago"
+esperar "Pagar devuelve a dónde ir (en pruebas, el pago simulado)" 200 '"url":"\/tienda\/pago-simulado.html?numero='"$PAGO"'"'
+pedir POST /api/tienda/pagos/simulado "{\"numero\":\"$PAGO\",\"resultado\":\"cualquiera\"}"
+esperar "Un resultado inválido da 400" 400
+pedir POST /api/tienda/pagos/simulado "{\"numero\":\"$PAGO\",\"resultado\":\"rechazado\"}"
+esperar "Pago rechazado: queda registrado" 200 '"resultado":"rechazado"'
+esperar "  y la compra sigue esperando el pago" 200 '"estado":"PENDIENTE_PAGO"'
+pedir POST /api/tienda/pagos/simulado "{\"numero\":\"$PAGO\",\"resultado\":\"aprobado\"}"
+esperar "Pago aprobado: la compra queda lista para retirar" 200 '"estado":"PAGADA"'
+esperar "  con el número de operación como comprobante" 200 '"operacion_mp":"simulado-'
+pedir POST "/api/tienda/compras/$PAGO/pago"
+esperar "Una compra pagada no se vuelve a pagar (409)" 409 'no está esperando el pago'
+pedir POST /api/tienda/pagos/simulado "{\"numero\":\"$PAGO\",\"resultado\":\"aprobado\"}"
+esperar "Un segundo pago de una compra ya pagada se devuelve" 200 '"resultado":"devolver"'
+
+# Pago tardío con stock: la compra se canceló, pero el pago llega igual y hay stock -> se revive.
+pedir POST /api/tienda/carrito/items '{"producto_id":114,"cantidad":2}'
+pedir POST /api/tienda/carrito/confirmar
+TARDIO=$(numero_de)
+pedir POST "/api/tienda/compras/$TARDIO/cancelar"
+stock_de 114; ANTES=$STOCK
+pedir POST /api/tienda/pagos/simulado "{\"numero\":\"$TARDIO\",\"resultado\":\"aprobado\"}"
+esperar "Pago tardío con stock: la compra revive y queda pagada" 200 '"resultado":"revivido"'
+stock_de 114
+[ "$STOCK" -eq $((ANTES - 2)) ] && echo "  ok     el stock se vuelve a reservar ($ANTES -> $STOCK)" || { echo "  FALLA  el stock no se reservó ($ANTES -> $STOCK)"; FALLAS=$((FALLAS+1)); }
+TOTAL=$((TOTAL+1))
+
+# Pago tardío sin stock: entre la cancelación y el pago, otro comprador se llevó todo -> se devuelve.
+stock_de 111; HAY=$STOCK
+pedir POST /api/tienda/carrito/items "{\"producto_id\":111,\"cantidad\":$HAY}"
+pedir POST /api/tienda/carrito/confirmar
+SIN_STOCK=$(numero_de)
+pedir POST "/api/tienda/compras/$SIN_STOCK/cancelar"
+cerrar_sesion
+iniciar_sesion cliente@prueba.huellavet 'Cliente-Prueba-2026'
+pedir POST /api/tienda/carrito/items "{\"producto_id\":111,\"cantidad\":$HAY}"
+pedir POST /api/tienda/carrito/confirmar
+OTRO=$(numero_de)
+cerrar_sesion
+iniciar_sesion rescatista@prueba.huellavet 'Rescatista-Prueba-2026'
+pedir POST /api/tienda/pagos/simulado "{\"numero\":\"$SIN_STOCK\",\"resultado\":\"aprobado\"}"
+esperar "Pago tardío sin stock: se devuelve el importe" 200 '"resultado":"devolver"'
+esperar "  y la compra sigue cancelada" 200 '"estado":"CANCELADA"'
+pedir GET /api/notificaciones
+esperar "  y le avisa que le devolvimos el importe" 200 "No pudimos aplicar tu pago al pedido $SIN_STOCK"
+cerrar_sesion
+iniciar_sesion cliente@prueba.huellavet 'Cliente-Prueba-2026'
+pedir POST "/api/tienda/compras/$OTRO/cancelar"
+cerrar_sesion
+
+# El aviso de Mercado Pago sin firma válida no se acepta.
+pedir POST '/api/tienda/pagos/aviso?type=payment&data.id=123' '{"type":"payment","data":{"id":"123"}}'
+esperar "Un aviso de pago sin firma de Mercado Pago da 401" 401
+
 # --- Tarea de vencimientos (GitHub Actions) ---
 pedir POST /api/tienda/tareas/vencer
 esperar "La tarea sin su token da 401" 401

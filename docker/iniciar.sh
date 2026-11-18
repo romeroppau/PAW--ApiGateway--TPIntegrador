@@ -16,16 +16,17 @@ OPC="-d display_errors=0 -d log_errors=1"
 # WHATSAPP_TOKEN: solo lo recibe Backend (envía los avisos por WhatsApp).
 # TAREAS_TOKEN: lo reciben Backend y Inventario, que atienden las tareas programadas
 # (Inventario: POST /api/tienda/tareas/vencer, vencimientos y recordatorios de la tienda).
+# MP_ACCESS_TOKEN y MP_WEBHOOK_SECRET (Mercado Pago): solo los recibe Inventario (cobra la tienda).
 
 # Gateway: no recibe la clave privada JWT, el token interno ni los de WhatsApp y tareas.
-env -u JWT_PRIVATE_KEY -u INTERNAL_TOKEN -u WHATSAPP_TOKEN -u TAREAS_TOKEN php $OPC \
+env -u JWT_PRIVATE_KEY -u INTERNAL_TOKEN -u WHATSAPP_TOKEN -u TAREAS_TOKEN -u MP_ACCESS_TOKEN -u MP_WEBHOOK_SECRET php $OPC \
   -S 127.0.0.1:9000 \
   -t /app/comun \
   /app/comun/index.php &
 
 # Backend: recibe sus credenciales, la clave privada JWT, el token interno
 # y los de WhatsApp y tareas (los usa solo él).
-env \
+env -u MP_ACCESS_TOKEN -u MP_WEBHOOK_SECRET \
   DB_USER="$BACKEND_DB_USER" \
   DB_PASSWORD="$BACKEND_DB_PASSWORD" \
   php $OPC \
@@ -33,7 +34,8 @@ env \
   -t /app/Backend/src \
   /app/Backend/src/Index.php &
 
-# Inventario: no recibe la clave privada JWT ni el de WhatsApp. Sí el de tareas (vencimientos de la tienda).
+# Inventario: no recibe la clave privada JWT ni el de WhatsApp. Sí el de tareas (vencimientos de la tienda)
+# y los de Mercado Pago (cobra la tienda).
 env -u JWT_PRIVATE_KEY -u WHATSAPP_TOKEN \
   DB_USER="$INVENTARIO_DB_USER" \
   DB_PASSWORD="$INVENTARIO_DB_PASSWORD" \
@@ -49,7 +51,7 @@ env -u JWT_PRIVATE_KEY -u WHATSAPP_TOKEN \
 if [ -f /app/Pacientes/src/index.php ] \
   && [ -n "${PACIENTES_DB_USER:-}" ] \
   && [ -n "${PACIENTES_DB_PASSWORD:-}" ]; then
-  env -u JWT_PRIVATE_KEY -u WHATSAPP_TOKEN -u TAREAS_TOKEN \
+  env -u JWT_PRIVATE_KEY -u WHATSAPP_TOKEN -u TAREAS_TOKEN -u MP_ACCESS_TOKEN -u MP_WEBHOOK_SECRET \
     DB_USER="$PACIENTES_DB_USER" \
     DB_PASSWORD="$PACIENTES_DB_PASSWORD" \
     php $OPC \
@@ -65,7 +67,7 @@ fi
 if [ -f /app/Adopciones/src/index.php ] \
   && [ -n "${ADOPCIONES_DB_USER:-}" ] \
   && [ -n "${ADOPCIONES_DB_PASSWORD:-}" ]; then
-  env -u JWT_PRIVATE_KEY -u WHATSAPP_TOKEN -u TAREAS_TOKEN \
+  env -u JWT_PRIVATE_KEY -u WHATSAPP_TOKEN -u TAREAS_TOKEN -u MP_ACCESS_TOKEN -u MP_WEBHOOK_SECRET \
     DB_USER="$ADOPCIONES_DB_USER" \
     DB_PASSWORD="$ADOPCIONES_DB_PASSWORD" \
     php $OPC \
@@ -77,6 +79,6 @@ else
 fi
 
 # Nginx tampoco debe heredar la clave privada ni los tokens.
-unset JWT_PRIVATE_KEY INTERNAL_TOKEN WHATSAPP_TOKEN TAREAS_TOKEN
+unset JWT_PRIVATE_KEY INTERNAL_TOKEN WHATSAPP_TOKEN TAREAS_TOKEN MP_ACCESS_TOKEN MP_WEBHOOK_SECRET
 
 exec nginx -g 'daemon off;'
