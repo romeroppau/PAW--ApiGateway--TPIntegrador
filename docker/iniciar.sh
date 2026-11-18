@@ -13,7 +13,9 @@ OPC="-d display_errors=0 -d log_errors=1"
 # INTERNAL_TOKEN: token de las llamadas internas entre módulos (/internal/).
 # Lo reciben Inventario y Pacientes (stock), Backend (notificaciones) y Adopciones/Reportes (que llaman).
 # El Gateway y Nginx no lo reciben.
-# WHATSAPP_TOKEN y TAREAS_TOKEN: solo los recibe Backend (envía los avisos y atiende las tareas).
+# WHATSAPP_TOKEN: solo lo recibe Backend (envía los avisos por WhatsApp).
+# TAREAS_TOKEN: lo reciben Backend y Inventario, que atienden las tareas programadas
+# (Inventario: POST /api/tienda/tareas/vencer, vencimientos y recordatorios de la tienda).
 
 # Gateway: no recibe la clave privada JWT, el token interno ni los de WhatsApp y tareas.
 env -u JWT_PRIVATE_KEY -u INTERNAL_TOKEN -u WHATSAPP_TOKEN -u TAREAS_TOKEN php $OPC \
@@ -31,8 +33,8 @@ env \
   -t /app/Backend/src \
   /app/Backend/src/Index.php &
 
-# Inventario: no recibe la clave privada JWT ni los de WhatsApp y tareas.
-env -u JWT_PRIVATE_KEY -u WHATSAPP_TOKEN -u TAREAS_TOKEN \
+# Inventario: no recibe la clave privada JWT ni el de WhatsApp. Sí el de tareas (vencimientos de la tienda).
+env -u JWT_PRIVATE_KEY -u WHATSAPP_TOKEN \
   DB_USER="$INVENTARIO_DB_USER" \
   DB_PASSWORD="$INVENTARIO_DB_PASSWORD" \
   php $OPC \
