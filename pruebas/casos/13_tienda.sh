@@ -93,6 +93,7 @@ stock_de 101; ANTES=$STOCK
 pedir POST /api/tienda/carrito/confirmar
 esperar "Confirmar crea la factura V-… pendiente de pago" 201 '"estado":"PENDIENTE_PAGO"'
 esperar "La compra trae hasta cuándo pagar" 201 '"pagar_antes_de":"'
+esperar "  y los segundos que faltan, contados por el servidor (15 minutos)" 201 '"segundos_para_pagar":9'
 NUMERO=$(printf '%s' "$RESPUESTA" | grep -o '"numero":"V-[0-9]*"' | cut -d'"' -f4)
 stock_de 101
 [ "$STOCK" -eq $((ANTES - 5)) ] && echo "  ok     Confirmar reserva el stock ($ANTES -> $STOCK)" || { echo "  FALLA  el stock no bajó 5 ($ANTES -> $STOCK)"; FALLAS=$((FALLAS+1)); }
@@ -207,7 +208,7 @@ cerrar_sesion
 # Ya se canceló "al pasar", con el primer pedido de un comprador a la tienda.
 iniciar_sesion rescatista@prueba.huellavet 'Rescatista-Prueba-2026'
 pedir GET /api/tienda/compras/V-000100
-esperar "Sin pagar en 30 minutos, la compra se cancela sola" 200 '"estado":"CANCELADA"'
+esperar "Sin pagar en 15 minutos, la compra se cancela sola" 200 '"estado":"CANCELADA"'
 cerrar_sesion
 stock_de 105
 [ "$STOCK" = 30 ] && echo "  ok     y el stock reservado vuelve (30)" || { echo "  FALLA  el stock de los snacks es $STOCK, esperaba 30"; FALLAS=$((FALLAS+1)); }
