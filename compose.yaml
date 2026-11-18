@@ -32,6 +32,14 @@ services:
 
       INTERNAL_TOKEN: "${INTERNAL_TOKEN:?Configura INTERNAL_TOKEN en .env}"
 
+      # Opcionales: sin ellas el envío por WhatsApp no sale (queda en el log) y el resto sigue.
+      WHATSAPP_TOKEN: "${WHATSAPP_TOKEN:-}"
+      WHATSAPP_NUMBER_ID: "${WHATSAPP_NUMERO_ID:-}"
+      WHATSAPP_PLANTILLA: "${WHATSAPP_PLANTILLA:-aviso_huellavet}"
+      WHATSAPP_IDIOMA: "${WHATSAPP_IDIOMA:-es_AR}"
+      TAREAS_TOKEN: "${TAREAS_TOKEN:-}"
+      ENTORNO: "${ENTORNO:-}"
+
       JWT_PRIVATE_KEY: "${JWT_PRIVATE_KEY:?Configura JWT_PRIVATE_KEY en .env}"
       JWT_PUBLIC_KEY: "${JWT_PUBLIC_KEY:?Configura JWT_PUBLIC_KEY en .env}"
 

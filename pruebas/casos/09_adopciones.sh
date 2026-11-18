@@ -79,6 +79,8 @@ SESION=$SESION_RESCATISTA2
 CSRF=$CSRF_RESCATISTA2
 pedir GET /api/auth/yo
 esperar "La rescatista ve que la aprobaron sin volver a iniciar sesión" 200 '"estado_validacion":"APROBADO"'
+pedir GET /api/notificaciones
+esperar "Y le llega el aviso de su cuenta aprobada" 200 'cuenta de rescatista fue aprobada'
 
 # --- Mascotas a cargo de la rescatista (Pacientes) ---
 iniciar_sesion rescatista@prueba.huellavet 'Rescatista-Prueba-2026'
@@ -171,6 +173,8 @@ esperar "Un cliente no completa adopciones (403)" 403
 
 # --- Elegir al adoptante (rescatista) ---
 iniciar_sesion rescatista@prueba.huellavet 'Rescatista-Prueba-2026'
+pedir GET /api/notificaciones
+esperar "A la rescatista le llega el aviso de la postulación" 200 'Cliente Dos se postuló para adoptar a Pipa'
 pedir GET /api/adopciones/101/postulaciones
 esperar "La rescatista ve los postulantes de Pipa, sin su teléfono" 200 '"telefono":null'
 pedir POST /api/adopciones/101/elegir '{}'
@@ -224,6 +228,9 @@ pedir GET /api/pacientes/mascotas/902
 esperar "Pipa pasó a ser del cliente 103" 200 '"nombre":"Pipa"'
 pedir GET /api/pacientes/mascotas/902/historial
 esperar "Con el chequeo en su historial" 200 'Chequeo de adopción'
+pedir GET /api/notificaciones
+esperar "Al adoptante le llegó el aviso de que lo eligieron" 200 'Te eligieron para adoptar a Pipa'
+esperar "Y el de la adopción completa" 200 'La adopción de Pipa está completa'
 iniciar_sesion rescatista@prueba.huellavet 'Rescatista-Prueba-2026'
 pedir GET /api/pacientes/mascotas/902
 esperar "La rescatista ya no tiene a Pipa (404)" 404

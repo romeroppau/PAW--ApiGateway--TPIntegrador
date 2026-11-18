@@ -4,10 +4,17 @@
 --   V-000101  cliente 102          2 x alimento cachorro (101)   PAGADA: lista para retirar (comprada ayer)
 --   V-000102  rescatista 104       1 x collar (110)              ENTREGADA (comprada hace 10 días)
 --   V-000103  cliente 102          1 x antiparasitario (106)     CANCELADA: venció el plazo de retiro, sin devolución
+--   V-000100  rescatista 104       1 x snacks dentales (105)     PENDIENTE_PAGO hace 40 minutos: venció el plazo para
+--                                                                pagar y se cancela sola (la tarea o al pasar)
 --   carrito 103 (abierto)  cliente 103   1 x comedero (112)      para probar el carrito y la confirmación
 --
 -- Las compras pagadas tienen su pago aprobado de Mercado Pago (con un número de operación de prueba)
--- y sus movimientos de stock. El stock de los productos no se toca: lo deja la semilla 002.
+-- y sus movimientos de stock. El stock lo deja la semilla 002; solo la V-000100 tiene 1 snack
+-- reservado (se resta acá y vuelve cuando se cancela).
+--
+-- La V-000100 y su carrito usan el id 100 (y no el siguiente libre) porque se agregaron después: los
+-- ids desde 104 ya los pueden tener compras reales de dev. La base numera las nuevas desde el más
+-- alto que existe, así que un id menor que 101 nunca lo toma otra compra.
 
 SET @ahora = UTC_TIMESTAMP() - INTERVAL 3 HOUR;   -- hora de Argentina (Aiven trabaja en UTC)
 
@@ -20,23 +27,26 @@ INSERT INTO carrito (id, cliente_id, estado, creado_en) VALUES
   (101, 102, 'PAGADO',    @ahora - INTERVAL 1 DAY),
   (102, 104, 'RETIRADO',  @ahora - INTERVAL 10 DAY),
   (103, 103, 'ABIERTO',   @ahora),
-  (104, 102, 'CANCELADO', @ahora - INTERVAL 12 DAY)
+  (104, 102, 'CANCELADO', @ahora - INTERVAL 12 DAY),
+  (100, 104, 'CONFIRMADO', @ahora - INTERVAL 40 MINUTE)
 ON DUPLICATE KEY UPDATE
   cliente_id = VALUES(cliente_id), estado = VALUES(estado), creado_en = VALUES(creado_en);
 
 -- Los ítems de cada carrito, con el precio del momento.
-DELETE FROM item_carrito WHERE carrito_id IN (101, 102, 103, 104);
+DELETE FROM item_carrito WHERE carrito_id IN (100, 101, 102, 103, 104);
 INSERT INTO item_carrito (carrito_id, producto_id, cantidad, precio_unitario) VALUES
   (101, 101, 2, 15999.90),
   (102, 110, 1,  5200.00),
   (103, 112, 1,  6700.00),
-  (104, 106, 1,  7800.00);
+  (104, 106, 1,  7800.00),
+  (100, 105, 1,  4500.00);
 
 -- Las facturas (el carrito abierto todavía no tiene).
 INSERT INTO factura_compra (id, numero, carrito_id, total, estado, fecha, entregada_en, entregada_por) VALUES
   (101, 'V-000101', 101, 31999.80, 'PAGADA',    @ahora - INTERVAL 1 DAY,  NULL,                   NULL),
   (102, 'V-000102', 102,  5200.00, 'ENTREGADA', @ahora - INTERVAL 10 DAY, @ahora - INTERVAL 7 DAY, 101),
-  (103, 'V-000103', 104,  7800.00, 'CANCELADA', @ahora - INTERVAL 12 DAY, NULL,                   NULL)
+  (103, 'V-000103', 104,  7800.00, 'CANCELADA', @ahora - INTERVAL 12 DAY, NULL,                   NULL),
+  (100, 'V-000100', 100,  4500.00, 'PENDIENTE_PAGO', @ahora - INTERVAL 40 MINUTE, NULL,          NULL)
 ON DUPLICATE KEY UPDATE
   numero = VALUES(numero), carrito_id = VALUES(carrito_id), total = VALUES(total), estado = VALUES(estado),
   fecha = VALUES(fecha), entregada_en = VALUES(entregada_en), entregada_por = VALUES(entregada_por);
@@ -56,4 +66,10 @@ INSERT IGNORE INTO movimiento_inventario (producto_id, tipo, cantidad, motivo, u
   (101, 'SALIDA',  2, 'VENTA',           102, 'semilla-venta-V-000101-101',   @ahora - INTERVAL 1 DAY),
   (110, 'SALIDA',  1, 'VENTA',           104, 'semilla-venta-V-000102-110',   @ahora - INTERVAL 10 DAY),
   (106, 'SALIDA',  1, 'VENTA',           102, 'semilla-venta-V-000103-106',   @ahora - INTERVAL 12 DAY),
-  (106, 'ENTRADA', 1, 'VENTA_CANCELADA', 102, 'semilla-cancela-V-000103-106', @ahora - INTERVAL 4 DAY);
+  (106, 'ENTRADA', 1, 'VENTA_CANCELADA', 102, 'semilla-cancela-V-000103-106', @ahora - INTERVAL 4 DAY),
+  (105, 'SALIDA',  1, 'VENTA',           104, 'semilla-venta-V-000100-105',   @ahora - INTERVAL 40 MINUTE);
+
+-- La V-000100 vuelve a estar sin pagar: el snack queda reservado otra vez y se borra la vuelta del
+-- stock de la cancelación anterior (su id_operacion es fijo y, si quedara, no se podría cancelar de nuevo).
+DELETE FROM movimiento_inventario WHERE id_operacion = 'cancela-V-000100-105';
+UPDATE producto SET stock = stock - 1 WHERE id = 105;
