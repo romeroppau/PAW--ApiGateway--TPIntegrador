@@ -21,15 +21,15 @@ env -u JWT_PRIVATE_KEY -u INTERNAL_TOKEN php $OPC \
   -t /app/comun \
   /app/comun/index.php &
 
-# Backend: recibe sus credenciales y la clave privada JWT, pero no el token interno.
-env -u INTERNAL_TOKEN \
+# Backend: recibe sus credenciales, la clave privada JWT y el token interno
+# (recibe /internal/notificaciones, que le llaman Adopciones y Reportes).
+env \
   DB_USER="$BACKEND_DB_USER" \
   DB_PASSWORD="$BACKEND_DB_PASSWORD" \
   php $OPC \
   -S 127.0.0.1:9001 \
   -t /app/Backend/src \
   /app/Backend/src/Index.php &
-
 # Inventario: no recibe la clave privada JWT.
 env -u JWT_PRIVATE_KEY \
   DB_USER="$INVENTARIO_DB_USER" \
