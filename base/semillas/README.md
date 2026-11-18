@@ -115,6 +115,20 @@ Volver a cargar las semillas devuelve estas mascotas a su dueño y **borra lo qu
 pruebas sobre ellas**: publicaciones, adopciones y postulaciones nuevas. Los chequeos que quedaron
 programados se cancelan. La foto de las publicaciones es un PNG de 1 x 1.
 
+## Compras de la tienda
+
+| Factura | Comprador | Qué | Estado | Para qué |
+|---|---|---|---|---|
+| V-000101 | 102 (`cliente@`) | 2 x alimento cachorro (101) | Pagada, lista para retirar (comprada ayer) | Constatar la entrega; los recordatorios |
+| V-000102 | 104 (`rescatista@`) | 1 x collar (110) | Entregada (hace 7 días, por la veterinaria 101) | Mostrar una compra terminada; un rescatista también compra |
+| V-000103 | 102 (`cliente@`) | 1 x antiparasitario (106) | Cancelada: venció el plazo de retiro, sin devolución | Mostrar una cancelada |
+| — | 103 (`cliente2@`) | 1 x comedero (112) en el **carrito abierto** 103 | Sin confirmar | Probar el carrito y la confirmación |
+
+Las tres facturas tienen su pago aprobado de Mercado Pago (números de operación de prueba) y sus
+movimientos de stock. El stock de los productos no cambia: lo deja la semilla 002. Volver a cargar
+las semillas devuelve estas compras a su estado y cancela otro carrito abierto que las pruebas le
+hayan dejado a estos compradores.
+
 ## Reglas para agregar semillas
 
 - Un archivo por tema: `NNN_tema.sql`, en orden.
