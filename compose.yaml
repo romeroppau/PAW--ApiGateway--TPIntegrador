@@ -40,6 +40,14 @@ services:
       TAREAS_TOKEN: "${TAREAS_TOKEN:-}"
       ENTORNO: "${ENTORNO:-}"
 
+      # Mercado Pago (pago de la tienda). Solo los recibe Inventario. Siempre credenciales de PRUEBA
+      # (vendedor de prueba): nunca se cobra de verdad. Sin ellas, el pago no está disponible (503);
+      # con ENTORNO=local o ci el pago es simulado y no hacen falta.
+      MP_ACCESS_TOKEN: "${MP_ACCESS_TOKEN:-}"
+      MP_WEBHOOK_SECRET: "${MP_WEBHOOK_SECRET:-}"
+      # Dirección pública del sitio (Vercel): la vuelta del comprador y el aviso de Mercado Pago.
+      SITIO_URL: "${SITIO_URL:-}"
+
       JWT_PRIVATE_KEY: "${JWT_PRIVATE_KEY:?Configura JWT_PRIVATE_KEY en .env}"
       JWT_PUBLIC_KEY: "${JWT_PUBLIC_KEY:?Configura JWT_PUBLIC_KEY en .env}"
 
