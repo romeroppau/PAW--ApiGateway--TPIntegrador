@@ -123,11 +123,12 @@ programados se cancelan. La foto de las publicaciones es un PNG de 1 x 1.
 | V-000102 | 104 (`rescatista@`) | 1 x collar (110) | Entregada (hace 7 días, por la veterinaria 101) | Mostrar una compra terminada; un rescatista también compra |
 | V-000103 | 102 (`cliente@`) | 1 x antiparasitario (106) | Cancelada: venció el plazo de retiro, sin devolución | Mostrar una cancelada |
 | V-000100 | 104 (`rescatista@`) | 1 x snacks dentales (105) | Esperando el pago desde hace 40 minutos | Venció el plazo para pagar: se cancela sola (la tarea o al pasar) y el stock vuelve. Usa el id 100 porque se agregó después: los ids desde 104 ya los pueden tener compras reales de dev |
+| V-000099 | 103 (`cliente2@`) | 1 x correa extensible (113) | Pagada hace 2 días, lista para retirar | Que el comprador cancele un pedido pagado (sin devolución) y el stock vuelva. Usa el id 99 por lo mismo que la V-000100 |
 | — | 103 (`cliente2@`) | 1 x comedero (112) en el **carrito abierto** 103 | Sin confirmar | Probar el carrito y la confirmación |
 
 Las facturas 101 a 103 tienen su pago aprobado de Mercado Pago (números de operación de prueba) y
 sus movimientos de stock. El stock de los productos lo deja la semilla 002, salvo 1 snack dental
-que queda reservado por la V-000100 hasta que se cancela. Volver a cargar
+y 1 correa extensible que quedan reservados por la V-000100 y la V-000099 hasta que se cancelan. Volver a cargar
 las semillas devuelve estas compras a su estado y cancela otro carrito abierto que las pruebas le
 hayan dejado a estos compradores.
 
