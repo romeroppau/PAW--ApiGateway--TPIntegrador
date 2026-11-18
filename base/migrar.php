@@ -14,6 +14,7 @@ try {
         'inventario' => variableObligatoria('INVENTARIO_DB_PASSWORD'),
         'pacientes' => variableObligatoria('PACIENTES_DB_PASSWORD'),
         'adopciones' => variableObligatoria('ADOPCIONES_DB_PASSWORD'),
+        'reportes' => variableObligatoria('REPORTES_DB_PASSWORD'),
     ];
 
     if (array_key_exists(strtolower($usuarioAdmin), $usuariosModulos)) {
