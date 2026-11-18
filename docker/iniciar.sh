@@ -12,8 +12,8 @@ mkdir -p \
 OPC="-d display_errors=0 -d log_errors=1"
 
 # INTERNAL_TOKEN: token de las llamadas internas entre módulos (/internal/).
-# Lo reciben Inventario (lo verifica), Pacientes (lo envía a Inventario y lo verifica al transferir
-# una mascota) y Adopciones (lo envía a Pacientes al completar una adopción).
+# Lo reciben Inventario y Pacientes (stock), Backend (notificaciones) y Adopciones/Reportes (que llaman).
+# El Gateway y Nginx no lo reciben.
 
 # Gateway: no recibe la clave privada JWT ni el token interno.
 env -u JWT_PRIVATE_KEY -u INTERNAL_TOKEN php $OPC \
@@ -21,15 +21,15 @@ env -u JWT_PRIVATE_KEY -u INTERNAL_TOKEN php $OPC \
   -t /app/comun \
   /app/comun/index.php &
 
-# Backend: recibe sus credenciales y la clave privada JWT, pero no el token interno.
-env -u INTERNAL_TOKEN \
+# Backend: recibe sus credenciales, la clave privada JWT y el token interno
+# (recibe /internal/notificaciones, que le llaman Adopciones y Reportes).
+env \
   DB_USER="$BACKEND_DB_USER" \
   DB_PASSWORD="$BACKEND_DB_PASSWORD" \
   php $OPC \
   -S 127.0.0.1:9001 \
   -t /app/Backend/src \
   /app/Backend/src/Index.php &
-
 # Inventario: no recibe la clave privada JWT.
 env -u JWT_PRIVATE_KEY \
   DB_USER="$INVENTARIO_DB_USER" \
