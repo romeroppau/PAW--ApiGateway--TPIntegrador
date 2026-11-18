@@ -152,6 +152,7 @@ esperar_salud gateway
 [ -f Inventario/src/index.php ]   && esperar_salud inventario
 [ -f Pacientes/src/index.php ]    && esperar_salud pacientes
 [ -f Adopciones/src/index.php ]   && esperar_salud adopciones
+[ -f Reportes/src/index.php ]     && esperar_salud reportes
 
 # --- 6. Pruebas de humo (si ya existen) -------------------------------------------------------
 if [ -f pruebas/humo.sh ]; then
