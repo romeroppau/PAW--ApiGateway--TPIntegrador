@@ -222,8 +222,29 @@ esperar "No se completa dos veces (409)" 409
 pedir GET '/api/adopciones?estado=FINALIZADA'
 esperar "La adopción aparece entre las finalizadas" 200 '"nombre":"Pipa"'
 
+# Listado paginado con filtros y detalle de una adopción.
+pedir GET '/api/adopciones?estado=FINALIZADA&buscar=Pipa&desde=2000-01-01&hasta=2099-12-31&por_pagina=5'
+esperar "Se filtra por nombre y por fechas" 200 '"nombre":"Pipa"'
+esperar "Y dice el total y la página" 200 '"pagina":1,"por_pagina":5'
+pedir GET '/api/adopciones?estado=FINALIZADA&buscar=NoExisteNinguna'
+esperar "Una búsqueda sin resultados da la lista vacía" 200 '"adopciones":[],"total":0'
+pedir GET '/api/adopciones?desde=2026-02-30'
+esperar "Una fecha que no existe da 400" 400 '"desde"'
+pedir GET '/api/adopciones?desde=2026-11-19&hasta=2026-11-01'
+esperar "Hasta antes que desde da 400" 400 '"hasta"'
+pedir GET '/api/adopciones?por_pagina=101'
+esperar "Más de 100 por página da 400" 400 '"por_pagina"'
+pedir GET /api/adopciones/101/detalle
+esperar "La veterinaria ve el detalle de la adopción" 200 '"postulaciones":['
+esperar "Con la consulta del chequeo" 200 "\"consulta_id\":${CONSULTA_CHEQUEO:-0}"
+esperar "Y el email del adoptante" 200 '"email":"cliente2@prueba.huellavet"'
+pedir GET /api/adopciones/999999/detalle
+esperar "Una adopción que no existe da 404" 404
+
 # Pipa ahora es del adoptante, con su historial.
 iniciar_sesion cliente2@prueba.huellavet 'Cliente-Prueba-2026'
+pedir GET /api/adopciones/101/detalle
+esperar "Un cliente no ve el detalle de una adopción (403)" 403
 pedir GET /api/pacientes/mascotas/902
 esperar "Pipa pasó a ser del cliente 103" 200 '"nombre":"Pipa"'
 pedir GET /api/pacientes/mascotas/902/historial
@@ -234,6 +255,8 @@ esperar "Y el de la adopción completa" 200 'La adopción de Pipa está completa
 iniciar_sesion rescatista@prueba.huellavet 'Rescatista-Prueba-2026'
 pedir GET /api/pacientes/mascotas/902
 esperar "La rescatista ya no tiene a Pipa (404)" 404
+pedir GET /api/adopciones/101/detalle
+esperar "Pero ve el detalle de su adopción" 200 '"estado":"FINALIZADA"'
 
 # --- Cancelar ---
 pedir POST "/api/adopciones/${ADOPCION_CANELA:-0}/cancelar"

@@ -8,8 +8,10 @@ GRANT SELECT, INSERT, UPDATE ON {{DB_NAME}}.adopcion    TO 'adopciones'@'%';
 GRANT SELECT, INSERT, UPDATE ON {{DB_NAME}}.postulacion TO 'adopciones'@'%';
 
 -- Adopciones solo lee lo de los demás: el rescatista y su estado (usuario), que la mascota esté a
--- cargo del rescatista (mascota) y que el chequeo esté ATENDIDO (turno). La mascota pasa al
--- adoptante por la llamada interna a Pacientes, nunca con un UPDATE desde Adopciones.
-GRANT SELECT ON {{DB_NAME}}.usuario TO 'adopciones'@'%';
-GRANT SELECT ON {{DB_NAME}}.mascota TO 'adopciones'@'%';
-GRANT SELECT ON {{DB_NAME}}.turno   TO 'adopciones'@'%';
+-- cargo del rescatista (mascota), que el chequeo esté ATENDIDO (turno) y su consulta (para
+-- enlazarla desde el detalle de la adopción). La mascota pasa al adoptante por la llamada interna
+-- a Pacientes, nunca con un UPDATE desde Adopciones.
+GRANT SELECT ON {{DB_NAME}}.usuario  TO 'adopciones'@'%';
+GRANT SELECT ON {{DB_NAME}}.mascota  TO 'adopciones'@'%';
+GRANT SELECT ON {{DB_NAME}}.turno    TO 'adopciones'@'%';
+GRANT SELECT ON {{DB_NAME}}.consulta TO 'adopciones'@'%';
