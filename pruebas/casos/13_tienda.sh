@@ -281,6 +281,8 @@ pedir POST "/api/tienda/compras/$TARDIO/cancelar"
 stock_de 114; ANTES=$STOCK
 pedir POST /api/tienda/pagos/simulado "{\"numero\":\"$TARDIO\",\"resultado\":\"aprobado\"}"
 esperar "Pago tardío con stock: la compra revive y queda pagada" 200 '"resultado":"revivido"'
+pedir GET /api/notificaciones
+esperar "  y le llega el mismo aviso que a un pago a tiempo" 200 "Recibimos el pago de tu pedido $TARDIO"
 stock_de 114
 [ "$STOCK" -eq $((ANTES - 2)) ] && echo "  ok     el stock se vuelve a reservar ($ANTES -> $STOCK)" || { echo "  FALLA  el stock no se reservó ($ANTES -> $STOCK)"; FALLAS=$((FALLAS+1)); }
 TOTAL=$((TOTAL+1))
@@ -302,7 +304,7 @@ pedir POST /api/tienda/pagos/simulado "{\"numero\":\"$SIN_STOCK\",\"resultado\":
 esperar "Pago tardío sin stock: se devuelve el importe" 200 '"resultado":"devolver"'
 esperar "  y la compra sigue cancelada" 200 '"estado":"CANCELADA"'
 pedir GET /api/notificaciones
-esperar "  y le avisa que le devolvimos el importe" 200 "No pudimos aplicar tu pago al pedido $SIN_STOCK"
+esperar "  y le avisa que se le devolvió el dinero porque terminó el tiempo para pagar" 200 "Tu pago del pedido $SIN_STOCK llegó cuando ya había terminado el tiempo para pagar"
 cerrar_sesion
 iniciar_sesion cliente@prueba.huellavet 'Cliente-Prueba-2026'
 pedir POST "/api/tienda/compras/$OTRO/cancelar"
