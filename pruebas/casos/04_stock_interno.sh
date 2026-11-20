@@ -68,7 +68,7 @@ pedir POST /api/inventario/productos/115/reactivar
 esperar "Se reactiva el producto" 200 '"activo":true'
 
 pedir GET /api/tienda/productos/115
-esperar "El producto reactivado vuelve a la tienda" 200 '"Cama acolchada mediana"'
+esperar "El producto reactivado vuelve a la tienda" 200 '"Cama acolchada lavable mediana 60 x 50 cm"'
 
 pedir POST /api/inventario/productos/999999/reactivar
 esperar "Reactivar un producto que no existe da 404" 404
