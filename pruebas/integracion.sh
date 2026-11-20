@@ -67,9 +67,12 @@ ADOPCIONES_DB_PASSWORD=$(clave)
 REPORTES_DB_USER=reportes
 REPORTES_DB_PASSWORD=$(clave)
 INTERNAL_TOKEN=$(openssl rand -hex 32)
+TAREAS_TOKEN=$(openssl rand -hex 32)
 JWT_PRIVATE_KEY="$(una_linea "$DIR/jwt_privada.pem")"
 JWT_PUBLIC_KEY="$(una_linea "$DIR/jwt_publica.pem")"
 EOF
+
+export TAREAS_TOKEN=$(grep '^TAREAS_TOKEN=' "$DIR/ci.env" | cut -d= -f2)
 
 # --- 3. Ajustes de Compose para la prueba ----------------------------------------------------
 # MySQL con SSL, y el certificado de .ci/ en lugar del ca.pem de cada uno.
