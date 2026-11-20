@@ -3,6 +3,12 @@
 # de los datos semilla: 002_productos y 010_tienda).
 es_entorno_de_prueba || return 0
 
+# --- La foto de un producto (la usan el catálogo y el carrito) ---
+pedir GET /api/tienda/productos/104/imagen
+esperar "Un producto sin foto: la imagen da 404" 404 '"Imagen no encontrada"'
+pedir GET /api/tienda/carrito
+esperar "El carrito sin sesión da 401 (y la foto es pública)" 401
+
 # --- Carrito: quién puede usarlo ---
 pedir GET /api/tienda/carrito
 esperar "El carrito sin sesión da 401" 401
