@@ -4,7 +4,7 @@ es_entorno_de_prueba || return 0
 
 # --- Catálogo (público): búsqueda, filtros y paginado, con los productos de las semillas ---
 pedir GET '/api/tienda/productos?buscar=cachorro'
-esperar "La búsqueda encuentra productos por nombre" 200 '"Alimento cachorro 3 kg"'
+esperar "La búsqueda encuentra productos por nombre" 200 '"Alimento Royal Canin Medium Puppy para cachorros 3 kg"'
 
 pedir GET '/api/tienda/productos?categoria=MEDICAMENTO'
 esperar "El filtro por categoría trae medicamentos" 200 '"categoria":"MEDICAMENTO"'
