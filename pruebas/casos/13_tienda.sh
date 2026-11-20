@@ -318,6 +318,37 @@ cerrar_sesion
 pedir POST '/api/tienda/pagos/aviso?type=payment&data.id=123' '{"type":"payment","data":{"id":"123"}}'
 esperar "Un aviso de pago sin firma de Mercado Pago da 401" 401
 
+# --- Plazos configurables: valen para las compras nuevas, no para las que ya existen ---
+# $PAGO es la compra pagada del rescatista (de las pruebas del pago): sigue para retirar.
+iniciar_sesion rescatista@prueba.huellavet 'Rescatista-Prueba-2026'
+pedir GET "/api/tienda/compras/$PAGO"
+RETIRO_ANTES=$(printf '%s' "$RESPUESTA" | grep -o '"retirar_hasta":"[0-9-]*"')
+[ -n "$RETIRO_ANTES" ] && echo "  ok     La compra pagada tiene su fecha de retiro ($RETIRO_ANTES)" || { echo "  FALLA  la compra $PAGO no tiene fecha de retiro"; FALLAS=$((FALLAS+1)); }
+TOTAL=$((TOTAL+1))
+cerrar_sesion
+iniciar_sesion vet@prueba.huellavet 'Vet-Prueba-2026'
+pedir PUT /api/configuracion '{"valores":{"minutos_para_pagar":20,"dias_habiles_para_retirar":10}}'
+esperar "La veterinaria cambia los plazos de la tienda" 200
+cerrar_sesion
+iniciar_sesion cliente@prueba.huellavet 'Cliente-Prueba-2026'
+pedir GET /api/tienda/carrito
+esperar "El carrito muestra los plazos nuevos" 200 '"minutos_para_pagar":20,"dias_habiles_para_retirar":10'
+pedir POST /api/tienda/carrito/items '{"producto_id":109,"cantidad":1}'
+pedir POST /api/tienda/carrito/confirmar
+esperar "Una compra nueva tiene 20 minutos para pagar" 201 '"segundos_para_pagar":1'
+esperar "  y 10 días hábiles para retirar" 201 '"dias_habiles_para_retirar":10'
+NUEVA=$(numero_de)
+pedir POST "/api/tienda/compras/$NUEVA/cancelar"
+cerrar_sesion
+iniciar_sesion rescatista@prueba.huellavet 'Rescatista-Prueba-2026'
+pedir GET "/api/tienda/compras/$PAGO"
+esperar "A una compra que ya existía no le cambia el plazo" 200 "$RETIRO_ANTES"
+cerrar_sesion
+iniciar_sesion vet@prueba.huellavet 'Vet-Prueba-2026'
+pedir PUT /api/configuracion '{"valores":{"minutos_para_pagar":15,"dias_habiles_para_retirar":5}}'
+esperar "Los plazos vuelven a los de siempre" 200
+cerrar_sesion
+
 # --- Tarea de vencimientos (GitHub Actions) ---
 pedir POST /api/tienda/tareas/vencer
 esperar "La tarea sin su token da 401" 401
