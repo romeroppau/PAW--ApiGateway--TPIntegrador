@@ -248,6 +248,8 @@ iniciar_sesion rescatista@prueba.huellavet 'Rescatista-Prueba-2026'
 pedir POST /api/tienda/carrito/items '{"producto_id":109,"cantidad":1}'
 pedir POST /api/tienda/carrito/confirmar
 PAGO=$(numero_de)
+pedir GET /api/notificaciones
+esperar "Al confirmar, al comprador le llega el aviso de la reserva" 200 "Reservamos los productos de tu pedido $PAGO"
 pedir POST "/api/tienda/compras/$PAGO/pago"
 esperar "Pagar devuelve a dónde ir (en pruebas, el pago simulado)" 200 '"url":"\/tienda\/pago-simulado.html?numero='"$PAGO"'"'
 pedir POST /api/tienda/pagos/simulado "{\"numero\":\"$PAGO\",\"resultado\":\"cualquiera\"}"
@@ -258,6 +260,14 @@ esperar "  y la compra sigue esperando el pago" 200 '"estado":"PENDIENTE_PAGO"'
 pedir POST /api/tienda/pagos/simulado "{\"numero\":\"$PAGO\",\"resultado\":\"aprobado\"}"
 esperar "Pago aprobado: la compra queda lista para retirar" 200 '"estado":"PAGADA"'
 esperar "  con el número de operación como comprobante" 200 '"operacion_mp":"simulado-'
+pedir GET /api/notificaciones
+esperar "  y al comprador le llega la constancia del pago" 200 "Recibimos el pago de tu pedido $PAGO"
+cerrar_sesion
+iniciar_sesion vet@prueba.huellavet 'Vet-Prueba-2026'
+pedir GET /api/notificaciones
+esperar "  y a la veterinaria, el aviso del pedido nuevo para retirar" 200 "Nuevo pedido para retirar: $PAGO"
+cerrar_sesion
+iniciar_sesion rescatista@prueba.huellavet 'Rescatista-Prueba-2026'
 pedir POST "/api/tienda/compras/$PAGO/pago"
 esperar "Una compra pagada no se vuelve a pagar (409)" 409 'no está esperando el pago'
 pedir POST /api/tienda/pagos/simulado "{\"numero\":\"$PAGO\",\"resultado\":\"aprobado\"}"
