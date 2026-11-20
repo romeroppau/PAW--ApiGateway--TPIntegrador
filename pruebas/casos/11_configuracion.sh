@@ -1,0 +1,70 @@
+# shellcheck shell=bash
+# Configuración de la veterinaria (Entrega 5, rol 3). Contrato: docs/api/contrato.md de Backend,
+# sección "Configuración". Cambia el horario de los turnos y el límite de stock bajo, prueba que
+# Pacientes y Reportes los usen y, al final, los vuelve a los valores por defecto (se borran las filas).
+
+cerrar_sesion
+pedir GET /api/configuracion
+esperar "Sin sesión no se ve la configuración (401)" 401
+pedir GET /api/pacientes/horario
+esperar "Sin sesión no se ve el horario de atención (401)" 401
+
+es_entorno_de_prueba || return 0
+
+iniciar_sesion cliente@prueba.huellavet 'Cliente-Prueba-2026'
+pedir GET /api/configuracion
+esperar "Un cliente no ve la configuración (403)" 403
+pedir PUT /api/configuracion '{"valores":{"hora_apertura":"09:00"}}'
+esperar "Un cliente no la cambia (403)" 403
+
+iniciar_sesion vet@prueba.huellavet 'Vet-Prueba-2026'
+
+# Se parte de los valores por defecto (en dev alguien pudo haberlos cambiado desde el panel).
+VALORES_POR_DEFECTO='{"valores":{"hora_apertura":"08:00","hora_cierre":"20:00","dias_aviso_vacuna":7,"dias_control_adopcion_1":30,"dias_control_adopcion_2":90,"limite_stock_bajo":10,"dias_liquidar":30}}'
+pedir PUT /api/configuracion "$VALORES_POR_DEFECTO"
+esperar "La veterinaria vuelve todo a los valores por defecto" 200 '"parametros":['
+
+pedir GET /api/configuracion
+esperar "Ve los parámetros con su nombre" 200 '"nombre":"Apertura"'
+esperar "Con su valor y su valor por defecto" 200 '"defecto":"08:00","valor":"08:00","modificado":false'
+
+CSRF_REAL=$CSRF; CSRF="no-es-el-token"
+pedir PUT /api/configuracion '{"valores":{"hora_apertura":"09:00"}}'
+esperar "Cambiarla sin el token CSRF correcto da 403" 403
+CSRF=$CSRF_REAL
+
+pedir PUT /api/configuracion '{"valores":{"hora_cierre":"07:30"}}'
+esperar "Un cierre antes de la apertura da 400 en ese campo" 400 '"hora_cierre":"El cierre tiene que ser después de la apertura"'
+pedir PUT /api/configuracion '{"valores":{"dias_aviso_vacuna":0}}'
+esperar "Un número fuera de rango da 400" 400 '"dias_aviso_vacuna":"Tiene que ser un número entero entre 1 y 30"'
+pedir PUT /api/configuracion '{"valores":{"no_existe":1}}'
+esperar "Un parámetro que no existe da 400" 400 '"no_existe"'
+pedir PUT /api/configuracion '{}'
+esperar "Sin valores da 400" 400 '"valores"'
+pedir PUT /api/configuracion '{"valores":{"hora_apertura":"09:00","dias_liquidar":0}}'
+esperar "Si uno está mal no se guarda ninguno (400)" 400 '"dias_liquidar"'
+pedir GET /api/pacientes/horario
+esperar "Y el horario sigue igual" 200 '"apertura":"08:00"'
+
+pedir PUT /api/configuracion '{"valores":{"hora_apertura":"09:00","limite_stock_bajo":3}}'
+esperar "La veterinaria abre a las 9 y baja el límite de stock" 200 '"valor":"09:00","modificado":true'
+esperar "Y queda quién lo cambió" 200 '"actualizado_por":"'
+
+# Pacientes usa el horario nuevo.
+pedir GET /api/pacientes/horario
+esperar "El horario de atención ahora empieza a las 9" 200 '"apertura":"09:00","cierre":"20:00"'
+MANIANA=$(date -d '+1 day' +%F)
+pedir POST /api/pacientes/turnos "{\"mascota_id\":101,\"fecha\":\"$MANIANA\",\"hora\":\"08:30\",\"motivo\":\"CONSULTA\"}"
+esperar "Un turno a las 8:30 ya no se puede dar" 400 'El horario de atención es de 09:00 a 20:00'
+
+# Reportes usa el límite de stock nuevo.
+pedir GET /api/reportes/stock
+esperar "El reporte de stock usa el límite nuevo" 200 '"limite_stock_bajo":3'
+
+# Se deja todo como estaba.
+pedir PUT /api/configuracion "$VALORES_POR_DEFECTO"
+esperar "Volver a los valores por defecto los deja sin modificar" 200 '"defecto":"08:00","valor":"08:00","modificado":false'
+pedir GET /api/pacientes/horario
+esperar "El horario vuelve a ser de 8 a 20" 200 '"apertura":"08:00","cierre":"20:00"'
+pedir GET /api/reportes/stock
+esperar "Y el límite de stock, 10" 200 '"limite_stock_bajo":10'
