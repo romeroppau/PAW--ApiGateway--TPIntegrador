@@ -57,9 +57,12 @@ ON DUPLICATE KEY UPDATE
   numero = VALUES(numero), carrito_id = VALUES(carrito_id), total = VALUES(total), estado = VALUES(estado),
   motivo_cancelacion = VALUES(motivo_cancelacion), cancelada_en = VALUES(cancelada_en),
   fecha = VALUES(fecha), entregada_en = VALUES(entregada_en), entregada_por = VALUES(entregada_por),
-  -- Los plazos (migración 015) quedan vacíos: Inventario los calcula desde la fecha con las reglas de
-  -- siempre (15 minutos y 5 días hábiles). Así una recarga no deja los plazos de la carga anterior.
-  pagar_antes_de = NULL, retirar_hasta = NULL;
+  -- Los plazos (migración 015) y la política de reintegro (017) quedan vacíos: Inventario usa los
+  -- valores de siempre (15 minutos, 5 días hábiles, 75 % / 50 % / 48 horas). Así una recarga no deja
+  -- los datos de la carga anterior (tampoco un reintegro de una cancelación de las pruebas).
+  pagar_antes_de = NULL, retirar_hasta = NULL,
+  reintegro_anticipado = NULL, reintegro_ultimo_momento = NULL, reintegro_horas = NULL,
+  reintegro_porcentaje = NULL, reintegro_monto = NULL, reintegro_estado = NULL, reintegro_en = NULL;
 
 -- Los pagos aprobados por Mercado Pago (la 103 venció después, sin devolución).
 INSERT INTO pago (id, factura_compra_id, monto, id_externo, estado, fecha) VALUES

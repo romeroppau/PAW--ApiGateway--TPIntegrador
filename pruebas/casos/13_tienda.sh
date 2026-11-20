@@ -252,14 +252,19 @@ stock_de 105
 [ "$STOCK" = 30 ] && echo "  ok     y el stock reservado vuelve (30)" || { echo "  FALLA  el stock de los snacks es $STOCK, esperaba 30"; FALLAS=$((FALLAS+1)); }
 TOTAL=$((TOTAL+1))
 
-# --- El comprador cancela un pedido ya pagado (V-000099 de las semillas): sin devolución ---
+# --- El comprador cancela un pedido ya pagado (V-000099 de las semillas, pagado hace 2 días) ---
+# Faltan al menos 3 días para su último día de retiro: cancela con anticipación y se le devuelve el 75 %.
 stock_de 113; ANTES=$STOCK
 iniciar_sesion cliente2@prueba.huellavet 'Cliente-Prueba-2026'
 pedir POST /api/tienda/compras/V-000099/cancelar
 esperar "El comprador cancela un pedido pagado" 200 '"estado":"CANCELADA"'
 esperar "  con el motivo: la canceló el comprador" 200 '"motivo_cancelacion":"COMPRADOR"'
+esperar "  y con anticipación se le devuelve el 75 % (de \$ 14.500)" 200 '"reintegro":{"porcentaje":75,"monto":10875'
+esperar "  ya hecho (en pruebas, Mercado Pago es simulado)" 200 '"estado":"HECHO"}'
 pedir GET /api/notificaciones
-esperar "  y le llega el aviso de que el importe no se reintegra" 200 'Cancelaste tu pedido V-000099'
+esperar "  y le llega el aviso con cuánto se le devuelve" 200 'Cancelaste tu pedido V-000099 y los productos volvieron a la tienda. Te devolvemos $ 10.875,00 (el 75 % de lo que pagaste)'
+pedir GET /api/tienda/compras/V-000099/factura
+esperar "  y la factura (cancelada) muestra el reintegro" 200 '"reintegro":{"porcentaje":75'
 pedir POST /api/tienda/compras/V-000099/cancelar
 esperar "No se cancela dos veces (409)" 409 '"La compra ya está cancelada"'
 cerrar_sesion
@@ -393,6 +398,7 @@ cerrar_sesion
 iniciar_sesion cliente@prueba.huellavet 'Cliente-Prueba-2026'
 pedir GET /api/tienda/carrito
 esperar "El carrito muestra los plazos nuevos" 200 '"minutos_para_pagar":20,"dias_habiles_para_retirar":10'
+esperar "  y la política de reintegro (75 % / 50 % / 48 horas)" 200 '"politica_reintegro":{"anticipado":75,"ultimo_momento":50,"horas":48}'
 pedir POST /api/tienda/carrito/items '{"producto_id":109,"cantidad":1}'
 pedir POST /api/tienda/carrito/confirmar
 esperar "Una compra nueva tiene 20 minutos para pagar" 201 '"segundos_para_pagar":1'
@@ -407,6 +413,31 @@ cerrar_sesion
 iniciar_sesion vet@prueba.huellavet 'Vet-Prueba-2026'
 pedir PUT /api/configuracion '{"valores":{"minutos_para_pagar":15,"dias_habiles_para_retirar":5}}'
 esperar "Los plazos vuelven a los de siempre" 200
+pedir PUT /api/configuracion '{"valores":{"porcentaje_reintegro_ultimo_momento":80}}'
+esperar "El reintegro a último momento no puede ser mayor que con anticipación (400)" 400 '"porcentaje_reintegro_ultimo_momento"'
+
+# --- Reintegro a último momento: con 3 días hábiles para retirar (a lo sumo 5 días corridos) y 168
+#     horas (7 días) de anticipación exigidas, cualquier cancelación es a último momento: 50 %.
+#     (3 es el mínimo con el primer recordatorio el día 1: tiene que ser 2 días antes del último.) ---
+pedir PUT /api/configuracion '{"valores":{"dia_primer_recordatorio":1,"dias_habiles_para_retirar":3,"horas_anticipacion_reintegro":168}}'
+esperar "La veterinaria exige 168 horas de anticipación para el reintegro mayor" 200
+cerrar_sesion
+iniciar_sesion rescatista@prueba.huellavet 'Rescatista-Prueba-2026'
+pedir POST /api/tienda/carrito/items '{"producto_id":109,"cantidad":1}'
+pedir POST /api/tienda/carrito/confirmar
+ULTIMO=$(numero_de)
+esperar "La compra guarda su política (168 horas)" 201 '"horas":168'
+pedir POST /api/tienda/pagos/simulado "{\"numero\":\"$ULTIMO\",\"resultado\":\"aprobado\"}"
+pedir GET "/api/tienda/compras/$ULTIMO"
+esperar "Pagada: si cancela hoy, se le devolvería el 50 %" 200 '"porcentaje_hoy":50'
+pedir POST "/api/tienda/compras/$ULTIMO/cancelar"
+esperar "Cancela a último momento: se le devuelve el 50 %" 200 '"reintegro":{"porcentaje":50'
+cerrar_sesion
+iniciar_sesion vet@prueba.huellavet 'Vet-Prueba-2026'
+pedir GET "/api/inventario/compras?estado=CANCELADA&buscar=$ULTIMO"
+esperar "La veterinaria ve el reintegro en los cancelados" 200 '"reintegro":{"porcentaje":50'
+pedir PUT /api/configuracion '{"valores":{"dias_habiles_para_retirar":5,"dia_primer_recordatorio":2,"horas_anticipacion_reintegro":48}}'
+esperar "La anticipación vuelve a 48 horas (y el plazo a 5 días hábiles)" 200
 cerrar_sesion
 
 # --- Tarea de vencimientos (GitHub Actions) ---
@@ -416,6 +447,7 @@ if [ -n "${TAREAS_TOKEN:-}" ]; then
   RESPUESTA=$(curl -s -w '\n%{http_code}' -X POST -H "X-Tarea-Token: $TAREAS_TOKEN" "$BASE_URL/api/tienda/tareas/vencer")
   CODIGO=$(printf '%s' "$RESPUESTA" | tail -n1); RESPUESTA=$(printf '%s' "$RESPUESTA" | sed '$d')
   esperar "La tarea con su token corre y cuenta lo que hizo" 200 '"canceladas_sin_pago":'
+  esperar "  (también los reintegros pendientes)" 200 '"reintegros":'
 else
   echo "  (sin TAREAS_TOKEN: no se prueba la tarea con su token)"
 fi
