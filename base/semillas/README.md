@@ -15,6 +15,9 @@ Desde la carpeta del Gateway, después del migrador:
 
 Se pueden correr todas las veces que haga falta: vuelven a dejar los datos de prueba como estaban.
 
+Para ver las pantallas con **muchos datos** (meses de turnos, 150 compras, 200 avisos...) hay un
+juego aparte, que se carga a mano después de estas: `base/semillas-volumen/README.md`.
+
 ## Cuentas de prueba
 
 Son de prueba y no existen en producción, por eso las contraseñas están acá.
