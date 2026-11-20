@@ -112,6 +112,23 @@ esperar "Confirmar un carrito vacío da 409" 409 '"El carrito está vacío"'
 
 pedir GET /api/tienda/compras
 esperar "La compra aparece en Mis compras" 200 "\"$NUMERO\""
+esperar "  de a 20, con si hay más" 200 '"por_pagina":20,"hay_mas":false'
+esperar "  y la que todavía no se pagó no tiene factura" 200 '"tiene_factura":false'
+pedir GET /api/tienda/compras
+esperar "Sin fechas, se ven los últimos 30 días (V-000103 es de hace 12)" 200 '"V-000103"'
+pedir GET '/api/tienda/compras?desde=2020-01-01&hasta=2020-01-31'
+esperar "Entre dos fechas sin compras, la lista está vacía" 200 '"datos":[]'
+esperar "  y devuelve las fechas que usó" 200 '"desde":"2020-01-01","hasta":"2020-01-31"'
+pedir GET '/api/tienda/compras?hasta=2020-01-31'
+esperar "Con solo hasta, son los 30 días que terminan ese día" 200 '"desde":"2020-01-02","hasta":"2020-01-31"'
+pedir GET '/api/tienda/compras?desde=2020-02-30'
+esperar "Una fecha que no existe da 400" 400 '"desde"'
+pedir GET '/api/tienda/compras?desde=2020-02-01&hasta=2020-01-01'
+esperar "Desde después de hasta da 400" 400 '"desde"'
+pedir GET '/api/tienda/compras?pagina=0'
+esperar "Una página 0 da 400" 400 '"pagina"'
+pedir GET '/api/tienda/compras?pagina=2'
+esperar "Una página después de la última está vacía" 200 '"datos":[],"pagina":2'
 pedir GET "/api/tienda/compras/$NUMERO"
 esperar "Se ve la compra con sus productos" 200 '"items":[{"producto_id":101'
 cerrar_sesion
@@ -183,11 +200,11 @@ esperar "Buscar por el número completo también" 200 '"V-000101"'
 pedir GET '/api/inventario/compras?buscar=cliente%20de%20prueba'
 esperar "Buscar por el nombre del comprador (sin importar mayúsculas)" 200 '"comprador":"Cliente de Prueba"'
 pedir GET '/api/inventario/compras?buscar=V-000102'
-esperar "El buscador busca dentro de la pestaña (V-000102 está entregado)" 200 '{"datos":[]}'
+esperar "El buscador busca dentro de la pestaña (V-000102 está entregado)" 200 '"datos":[]'
 pedir GET '/api/inventario/compras?buscar=%25'
-esperar "Un % se busca como letra, no trae todo" 200 '{"datos":[]}'
+esperar "Un % se busca como letra, no trae todo" 200 '"datos":[]'
 pedir GET '/api/inventario/compras?buscar=0'
-esperar "Buscar 0 no trae todo" 200 '{"datos":[]}'
+esperar "Buscar 0 no trae todo" 200 '"datos":[]'
 CSRF_REAL=$CSRF; CSRF="no-es-el-token"
 pedir POST /api/tienda/compras/V-000101/entregada
 CSRF=$CSRF_REAL
@@ -207,6 +224,21 @@ esperar "  con qué veterinaria la entregó" 200 '"entregada_por":"Veterinaria d
 pedir GET /api/inventario/compras
 if printf '%s' "$RESPUESTA" | grep -q '"V-000101"'; then echo "  FALLA  la entregada sigue en pedidos para retirar"; FALLAS=$((FALLAS+1)); else echo "  ok     La entregada ya no está en pedidos para retirar"; fi
 TOTAL=$((TOTAL+1))
+pedir GET '/api/inventario/compras?estado=ENTREGADA&desde=2020-01-01&hasta=2020-01-31'
+esperar "Los entregados se filtran por fecha de entrega" 200 '"datos":[]'
+pedir GET '/api/inventario/compras?estado=ENTREGADA&desde=2020-13-01'
+esperar "  y una fecha inválida da 400" 400 '"desde"'
+pedir GET '/api/inventario/compras?desde=2020-01-01&hasta=2020-01-31'
+esperar "Los pedidos para retirar no se filtran por fecha (están todos vigentes)" 200 '"desde":null'
+pedir GET '/api/inventario/compras?vence=hoy'
+esperar "Se pueden pedir solo los que tienen hoy su último día" 200 '"datos":['
+pedir GET /api/inventario/compras/resumen
+esperar "El resumen cuenta los pedidos para retirar y los que vencen hoy" 200 '"para_retirar":'
+esperar "  (y los de hoy)" 200 '"vencen_hoy":'
+cerrar_sesion
+iniciar_sesion cliente@prueba.huellavet 'Cliente-Prueba-2026'
+pedir GET /api/inventario/compras/resumen
+esperar "Un cliente no ve el resumen de la veterinaria (403)" 403
 cerrar_sesion
 
 # --- Vencimiento del plazo para pagar (V-000100 de las semillas: sin pagar desde hace 40 minutos) ---
@@ -312,6 +344,34 @@ esperar "  y le avisa que se le devolvió el dinero porque terminó el tiempo pa
 cerrar_sesion
 iniciar_sesion cliente@prueba.huellavet 'Cliente-Prueba-2026'
 pedir POST "/api/tienda/compras/$OTRO/cancelar"
+cerrar_sesion
+
+# --- Factura: solo de las compras pagadas (aunque después se hayan cancelado) ---
+pedir GET "/api/tienda/compras/$PAGO/factura"
+esperar "La factura pide sesión (401)" 401
+iniciar_sesion rescatista@prueba.huellavet 'Rescatista-Prueba-2026'
+pedir GET "/api/tienda/compras/$PAGO/factura"
+esperar "El comprador ve la factura de su compra pagada" 200 "\"numero\":\"$PAGO\""
+esperar "  con el medio de pago y el número de operación" 200 '"pago":{"medio":"Mercado Pago","operacion":"simulado-'
+esperar "  y los productos" 200 '"items":[{"producto_id":109'
+pedir GET /api/tienda/compras/V-000100/factura
+esperar "Una compra que no se pagó no tiene factura (404)" 404 '"Factura no encontrada"'
+pedir GET "/api/tienda/compras/$SIN_STOCK/factura"
+esperar "Un pago tardío que se devolvió no da factura (404)" 404
+pedir GET "/api/tienda/compras/$SIN_STOCK"
+esperar "  y la compra dice que no tiene factura" 200 '"tiene_factura":false'
+pedir GET "/api/tienda/compras/$PAGO"
+esperar "Una compra pagada dice que tiene factura" 200 '"tiene_factura":true'
+cerrar_sesion
+iniciar_sesion cliente@prueba.huellavet 'Cliente-Prueba-2026'
+pedir GET "/api/tienda/compras/$PAGO/factura"
+esperar "Un comprador no ve la factura de otro (404)" 404
+pedir GET /api/tienda/compras/V-000103/factura
+esperar "Una compra pagada y después cancelada tiene factura (como cancelada)" 200 '"estado":"CANCELADA"'
+cerrar_sesion
+iniciar_sesion vet@prueba.huellavet 'Vet-Prueba-2026'
+pedir GET "/api/tienda/compras/$PAGO/factura"
+esperar "La veterinaria ve la factura de cualquier compra pagada" 200 '"comprador":{"nombre":'
 cerrar_sesion
 
 # El aviso de Mercado Pago sin firma válida no se acepta.
