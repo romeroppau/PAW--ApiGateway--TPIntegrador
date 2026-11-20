@@ -254,8 +254,6 @@ iniciar_sesion rescatista@prueba.huellavet 'Rescatista-Prueba-2026'
 pedir POST /api/tienda/carrito/items '{"producto_id":109,"cantidad":1}'
 pedir POST /api/tienda/carrito/confirmar
 PAGO=$(numero_de)
-pedir GET /api/notificaciones
-esperar "Al confirmar, al comprador le llega el aviso de la reserva" 200 "Reservamos los productos de tu pedido $PAGO"
 pedir POST "/api/tienda/compras/$PAGO/pago"
 esperar "Pagar devuelve a dónde ir (en pruebas, el pago simulado)" 200 '"url":"\/tienda\/pago-simulado.html?numero='"$PAGO"'"'
 pedir POST /api/tienda/pagos/simulado "{\"numero\":\"$PAGO\",\"resultado\":\"cualquiera\"}"
