@@ -1,0 +1,74 @@
+# Tarea diaria del motor de recomendaciones y avisos (Entrega 5, rol 4).
+#
+# Corre una vez por día a las 09:00 de Argentina (12:00 UTC) y también se puede disparar a mano
+# desde la pestaña Actions ("Run workflow") eligiendo dev o producción.
+#
+# 1. POST /api/reportes/tareas/diaria evalúa las reglas del motor (vacuna próxima, vacuna vencida,
+#    control de adopción, stock bajo y qué liquidar) y deja cada aviso en Backend con su id_operacion.
+# 2. POST /api/notificaciones/tareas/enviar despacha los avisos de WhatsApp que acaban de quedar
+#    pendientes (los de canal WEB ya están disponibles en la campana).
+
+name: Motor diario
+
+on:
+  schedule:
+    - cron: '0 12 * * *'
+  workflow_dispatch:
+    inputs:
+      entorno:
+        description: 'Entorno donde correr el motor diario'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - prod
+          - ambos
+
+jobs:
+  motor-diario:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Ejecutar motor diario y envío en dev
+        if: github.event_name == 'schedule' || inputs.entorno == 'dev' || inputs.entorno == 'ambos'
+        env:
+          URL: https://paw-apigateway-tpintegrador-dev.onrender.com
+          TOKEN: ${{ secrets.TAREAS_TOKEN_DEV || secrets.TAREAS_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "::warning::Falta configurar el secret TAREAS_TOKEN (o TAREAS_TOKEN_DEV) en el repositorio."
+            exit 0
+          fi
+          echo "=== Motor diario (dev): POST $URL/api/reportes/tareas/diaria"
+          curl --fail --silent --show-error --max-time 60 -X POST \
+            -H "X-Tarea-Token: $TOKEN" \
+            "$URL/api/reportes/tareas/diaria"
+          echo
+          echo "=== Envío de WhatsApp pendientes (dev): POST $URL/api/notificaciones/tareas/enviar"
+          curl --fail --silent --show-error --max-time 60 -X POST \
+            -H "X-Tarea-Token: $TOKEN" \
+            "$URL/api/notificaciones/tareas/enviar"
+          echo
+
+      - name: Ejecutar motor diario y envío en producción
+        if: github.event_name == 'schedule' || inputs.entorno == 'prod' || inputs.entorno == 'ambos'
+        env:
+          URL: https://paw-apigateway-tpintegrador.onrender.com
+          TOKEN: ${{ secrets.TAREAS_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "::warning::Falta configurar el secret TAREAS_TOKEN en el repositorio."
+            exit 0
+          fi
+          echo "=== Motor diario (producción): POST $URL/api/reportes/tareas/diaria"
+          curl --fail --silent --show-error --max-time 60 -X POST \
+            -H "X-Tarea-Token: $TOKEN" \
+            "$URL/api/reportes/tareas/diaria"
+          echo
+          echo "=== Envío de WhatsApp pendientes (producción): POST $URL/api/notificaciones/tareas/enviar"
+          curl --fail --silent --show-error --max-time 60 -X POST \
+            -H "X-Tarea-Token: $TOKEN" \
+            "$URL/api/notificaciones/tareas/enviar"
+          echo
