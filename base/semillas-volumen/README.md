@@ -10,7 +10,9 @@ sean exactamente esas. Por eso:
 - **Solo se carga a mano**, en local o en dev. `base/sembrar.php volumen` se niega en el CI y en
   producción.
 - **Se carga después de las semillas comunes** (usa sus usuarios, productos e insumos).
-- Con el volumen cargado, la prueba de humo sigue pasando entera (probado: 449 de 449).
+- Con el volumen cargado, la prueba de humo pasa salvo un caso: el de `12_reportes.sh` que cuenta
+  exactamente los turnos de una franja ("Lunes a la mañana: 2"), porque el volumen suma turnos
+  (probado el 21/11: 490 de 491).
 
 ## Cómo se carga
 
@@ -64,6 +66,11 @@ todo el volumen (agenda, reportes, adopciones, ventas) y el cliente 102 tiene ma
 compras, postulaciones y avisos del volumen.
 
 ## Cuidados
+
+- **Aiven exige clave primaria** en toda tabla nueva, también en las temporales
+  (`sql_require_primary_key=ON`). Por eso las tablas temporales de 004 y 005 se crean con su clave
+  primaria y se llenan después. Para probarlo en local: `SET GLOBAL sql_require_primary_key = ON;`
+  en el MySQL de Docker antes de cargar.
 
 - **Nunca en producción.** Las semillas no se cargan ahí (`sembrar.php` se niega).
 - Los usuarios del volumen **no tienen teléfono**: los avisos del motor para ellos quedan en la web
