@@ -1,0 +1,19 @@
+name: Enviar avisos
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+jobs:
+  enviar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Llamar a la tarea de envío
+        env:
+          URL_BASE: ${{ vars.URL_BASE }}
+          TAREAS_TOKEN: ${{ secrets.TAREAS_TOKEN }}
+        run: |
+          curl --fail-with-body -sS -X POST \
+            -H "X-Tarea-Token: $TAREAS_TOKEN" \
+            "$URL_BASE/api/notificaciones/tareas/enviar"
