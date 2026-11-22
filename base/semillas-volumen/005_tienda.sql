@@ -13,8 +13,21 @@
 
 SET @ahora = UTC_TIMESTAMP() - INTERVAL 3 HOUR;
 
+-- Con clave primaria: Aiven tiene sql_require_primary_key=ON y no deja crear una tabla sin ella
+-- (tampoco una temporal), por eso se crea primero y se llena después.
 DROP TEMPORARY TABLE IF EXISTS vol_compra;
-CREATE TEMPORARY TABLE vol_compra AS
+CREATE TEMPORARY TABLE vol_compra (
+  i        INT           NOT NULL,
+  cliente  INT UNSIGNED  NOT NULL,
+  fecha    DATETIME      NOT NULL,
+  estado   VARCHAR(20)   NOT NULL,
+  motivo   VARCHAR(20)   NULL,
+  producto INT UNSIGNED  NOT NULL,
+  cantidad INT           NOT NULL,
+  precio   DECIMAL(10,2) NOT NULL,
+  PRIMARY KEY (i)
+);
+INSERT INTO vol_compra (i, cliente, fecha, estado, motivo, producto, cantidad, precio)
 WITH RECURSIVE n AS (SELECT 1 AS i UNION ALL SELECT i + 1 FROM n WHERE i < 150)
 SELECT n.i,
        IF(n.i % 5 = 0, 102, 2002 + (n.i % 40)) AS cliente,

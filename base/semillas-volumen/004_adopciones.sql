@@ -44,8 +44,18 @@ DELETE FROM postulacion WHERE adopcion_id BETWEEN 20001 AND 20040;
 
 -- 2. Datos de cada adopción, en una tabla temporal (la usan varios INSERT de abajo).
 --    dias_fin: hace cuántos días terminó (finalizadas y canceladas).
+--    Lleva clave primaria: Aiven tiene sql_require_primary_key=ON y no deja crear una tabla sin
+--    ella (tampoco una temporal), por eso se crea primero y se llena después.
 DROP TEMPORARY TABLE IF EXISTS vol_adopcion;
-CREATE TEMPORARY TABLE vol_adopcion AS
+CREATE TEMPORARY TABLE vol_adopcion (
+  i         INT          NOT NULL,
+  estado    VARCHAR(20)  NULL,
+  adoptante INT UNSIGNED NOT NULL,
+  dias_fin  INT          NULL,
+  creada    DATETIME     NOT NULL,
+  PRIMARY KEY (i)
+);
+INSERT INTO vol_adopcion (i, estado, adoptante, dias_fin, creada)
 WITH RECURSIVE n AS (SELECT 1 AS i UNION ALL SELECT i + 1 FROM n WHERE i < 40)
 SELECT i,
        CASE
