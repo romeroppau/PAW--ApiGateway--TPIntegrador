@@ -19,6 +19,15 @@ CODIGO=$(curl --silent --max-time 60 -o /dev/null -w '%{http_code}' -X POST \
 RESPUESTA=""
 esperar "Con un X-Servicio-Token inventado también da 404" 404
 
+# La tarea de envío por WhatsApp (la llama GitHub Actions cada 15 minutos) exige X-Tarea-Token.
+pedir POST /api/notificaciones/tareas/enviar
+esperar "La tarea de envío sin X-Tarea-Token da 401" 401
+
+CODIGO=$(curl --silent --max-time 60 -o /dev/null -w '%{http_code}' -X POST \
+  -H 'X-Tarea-Token: token-incorrecto' "$BASE_URL/api/notificaciones/tareas/enviar")
+RESPUESTA=""
+esperar "La tarea de envío con un X-Tarea-Token inválido da 401" 401
+
 es_entorno_de_prueba || return 0
 
 # --- Ver y marcar como leída (el aviso 901 lo deja la semilla 008) ---
@@ -49,3 +58,23 @@ pedir POST /api/notificaciones/901/leida
 esperar "Marcarlo de nuevo también da 200" 200
 
 cerrar_sesion
+
+# --- La tarea de envío corre y devuelve el resumen (en local y ci el WhatsApp es simulado) ---
+if [ -z "${TAREAS_TOKEN:-}" ]; then
+  echo "  (sin TAREAS_TOKEN: no se prueba la ejecución de la tarea de envío)"
+  return 0
+fi
+
+SALIDA=$(curl --silent --max-time 60 -w '\n%{http_code}' -X POST \
+  -H "X-Tarea-Token: $TAREAS_TOKEN" "$BASE_URL/api/notificaciones/tareas/enviar")
+CODIGO=$(printf '%s' "$SALIDA" | tail -n1)
+RESPUESTA=$(printf '%s' "$SALIDA" | sed '$d')
+esperar "La tarea de envío con su token corre y devuelve el resumen" 200 '"enviadas":'
+esperar "  separando los que se reintentan de los descartados" 200 '"descartadas":'
+
+# Correrla de nuevo enseguida no vuelve a mandar lo que ya salió.
+SALIDA=$(curl --silent --max-time 60 -w '\n%{http_code}' -X POST \
+  -H "X-Tarea-Token: $TAREAS_TOKEN" "$BASE_URL/api/notificaciones/tareas/enviar")
+CODIGO=$(printf '%s' "$SALIDA" | tail -n1)
+RESPUESTA=$(printf '%s' "$SALIDA" | sed '$d')
+esperar "Una segunda corrida no reenvía los avisos ya enviados" 200 '"enviadas":0'
