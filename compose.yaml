@@ -34,9 +34,10 @@ services:
 
       # Opcionales: sin ellas el envío por WhatsApp no sale (queda en el log) y el resto sigue.
       WHATSAPP_TOKEN: "${WHATSAPP_TOKEN:-}"
-      WHATSAPP_NUMBER_ID: "${WHATSAPP_NUMERO_ID:-}"
+      WHATSAPP_NUMERO_ID: "${WHATSAPP_NUMERO_ID:-}"
       WHATSAPP_PLANTILLA: "${WHATSAPP_PLANTILLA:-aviso_huellavet}"
       WHATSAPP_IDIOMA: "${WHATSAPP_IDIOMA:-es_AR}"
+      WHATSAPP_API_VERSION: "${WHATSAPP_API_VERSION:-}"
       TAREAS_TOKEN: "${TAREAS_TOKEN:-}"
       ENTORNO: "${ENTORNO:-}"
 
