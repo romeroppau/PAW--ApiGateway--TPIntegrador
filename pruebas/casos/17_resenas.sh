@@ -16,13 +16,13 @@ es_entorno_de_prueba || return 0
 
 pedir GET /api/resenas
 esperar "La más nueva primero (la 105, de ayer)" 200 '"datos":[{"id":105,'
-esperar "  con el autor como nombre e inicial" 200 '"autor":"Cliente D."'
+esperar "  con el autor como nombre e inicial" 200 '"autor":"Valeria R."'
 pedir GET '/api/resenas?orden=peores'
 esperar "Calificación más baja primero (la de 3 estrellas)" 200 '"datos":[{"id":104,"estrellas":3'
 pedir GET '/api/resenas?estrellas=4'
 esperar "Solo las de 4 estrellas" 200 '"datos":[{"id":102,"estrellas":4'
 pedir GET '/api/resenas?minimo=4&pagina=2'
-esperar "Con mínimo 4, la página 2 tiene la más vieja (101) y su respuesta" 200 '"respuesta":{"texto":"¡Gracias por tu reseña!'
+esperar "Con mínimo 4, la página 2 tiene la más vieja (101) y su respuesta" 200 '"respuesta":{"texto":"¡Gracias por tu reseña, Lucía!'
 
 # --- Escribir y borrar (cliente 102) ---
 iniciar_sesion cliente@prueba.huellavet 'Cliente-Prueba-2026'

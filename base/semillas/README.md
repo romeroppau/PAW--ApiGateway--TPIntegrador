@@ -29,6 +29,7 @@ Son de prueba y no existen en producción, por eso las contraseñas están acá.
 | 103 | Cliente | `cliente2@prueba.huellavet` | `Cliente-Prueba-2026` |
 | 104 | Rescatista (aprobado) | `rescatista@prueba.huellavet` | `Rescatista-Prueba-2026` |
 | 105 | Rescatista (pendiente) | `rescatista2@prueba.huellavet` | `Rescatista-Prueba-2026` |
+| 120 a 124 | Clientes que escribieron las reseñas de ejemplo (semilla 011): Lucía Fernández, Martín Gómez, Carolina Pérez, Julián Sosa y Valeria Ríos | `lucia@resenas.huellavet`, `martin@…`, `carolina@…`, `julian@…`, `valeria@…` | `Cliente-Prueba-2026` |
 
 ## Productos
 
