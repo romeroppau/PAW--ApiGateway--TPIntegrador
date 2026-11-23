@@ -37,7 +37,16 @@ pedir GET /api/reportes/sugerencias
 esperar "La veterinaria ve las sugerencias con la franja de menor ocupación" 200 '"franja_sugerida":{'
 esperar "  con las 4 semanas analizadas" 200 '"semanas_analizadas":4'
 esperar "  con el texto de qué promocionar" 200 'turnos en 4 semanas: conviene promocionarlos'
-esperar "  con el listado de franjas de lunes a sábado" 200 '"dia_semana":"Lunes","franja":"mañana","cantidad_turnos":2'
+# Lunes a la mañana: las semillas cargan 2 turnos. Se pide "2 o más" y no exactamente 2: un lunes,
+# otros casos de esta misma prueba atienden turnos ese día a la mañana y también entran en la cuenta.
+LUNES_MANIANA=$(printf '%s' "$RESPUESTA" | grep -o '"dia_semana":"Lunes","franja":"mañana","cantidad_turnos":[0-9]*' | grep -o '[0-9]*$')
+TOTAL=$((TOTAL + 1))
+if [ "${LUNES_MANIANA:-0}" -ge 2 ]; then
+  echo "  ok       con el listado de franjas de lunes a sábado (lunes a la mañana: $LUNES_MANIANA turnos)"
+else
+  FALLAS=$((FALLAS + 1))
+  echo "  FALLA    con el listado de franjas de lunes a sábado: lunes a la mañana tiene ${LUNES_MANIANA:-ninguno}, esperaba 2 o más"
+fi
 esperar "  con el producto 101 por vencer en 7 días (30 % sugerido)" 200 '"producto_id":101,'
 esperar "    y su descuento sugerido de 30 %" 200 '"descuento_sugerido":30'
 esperar "  con el producto 107 por vencer en 20 días (15 % sugerido)" 200 '"producto_id":107,'
