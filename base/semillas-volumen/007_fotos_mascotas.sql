@@ -1,7 +1,7 @@
 -- Semilla de volumen 007 · fotos de las mascotas del volumen
 -- Las 122 mascotas del volumen (001: 20001 a 20082 de los clientes, 20101 a 20140 de los rescatistas)
 -- reciben una de 7 fotos de perro o de 6 de gato según su especie (van rotando: cada una toma la siguiente de su especie).
--- Solo toca esas mascotas: las que se cargaron a mano en dev no cambian. Se puede correr todas las veces.
+-- Solo toca esas mascotas, y solo si no tienen foto: no pisa una subida a mano. Se puede correr todas las veces.
 --
 -- Fotos de Unsplash (licencia Unsplash: uso libre, sin pedir permiso), recortadas a 400 x 400 JPEG:
 --   perro1: Nail Gilfanov
@@ -43,6 +43,7 @@ UPDATE mascota m
         WHERE id BETWEEN 20001 AND 20082 OR id BETWEEN 20101 AND 20140) r ON r.id = m.id
   JOIN foto_volumen f
     ON f.n = IF(r.especie = 'GATO', 100 + (r.orden % 6), r.orden % 7)
-  SET m.foto = f.foto, m.foto_tipo = 'image/jpeg';
+  SET m.foto = f.foto, m.foto_tipo = 'image/jpeg'
+WHERE m.foto IS NULL;   -- no pisa una foto que alguien haya subido
 
 DROP TEMPORARY TABLE IF EXISTS foto_volumen;
