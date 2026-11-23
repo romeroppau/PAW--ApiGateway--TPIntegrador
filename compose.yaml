@@ -36,6 +36,9 @@ services:
       WHATSAPP_TOKEN: "${WHATSAPP_TOKEN:-}"
       WHATSAPP_NUMERO_ID: "${WHATSAPP_NUMERO_ID:-}"
       WHATSAPP_PLANTILLA: "${WHATSAPP_PLANTILLA:-aviso_huellavet}"
+      # Plantilla de autenticación de Meta para el código de verificación. Vacía: el código sale con
+      # WHATSAPP_PLANTILLA (la de avisos, ya aprobada).
+      WHATSAPP_PLANTILLA_CODIGO: "${WHATSAPP_PLANTILLA_CODIGO:-}"
       WHATSAPP_IDIOMA: "${WHATSAPP_IDIOMA:-es_AR}"
       WHATSAPP_API_VERSION: "${WHATSAPP_API_VERSION:-}"
       TAREAS_TOKEN: "${TAREAS_TOKEN:-}"
