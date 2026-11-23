@@ -83,5 +83,9 @@ esperar "Sin sesión se ve el WhatsApp nuevo, con su enlace armado" 200 'wa.me\/
 esperar "  y el Instagram" 200 '"instagram":"https:\/\/www.instagram.com\/huellavet"'
 esperar "  y lo no cargado va vacío (no se muestra)" 200 '"facebook":null'
 iniciar_sesion vet@prueba.huellavet 'Vet-Prueba-2026'
+pedir PUT /api/configuracion '{"valores":{"whatsapp":"+1 555 145 9000"}}'
+esperar "El WhatsApp puede ser de otro país, con + y su código (el número de prueba de Meta)" 200 '"valor":"+1 555 145 9000"'
+pedir GET /api/configuracion/contacto
+esperar "  y el enlace va con ese número, sin el 9 de los celulares argentinos" 200 'wa.me\/15551459000"'
 pedir PUT /api/configuracion '{"valores":{"whatsapp":"11 3901-0486","instagram":""}}'
 esperar "Vuelven a como estaban" 200 '"clave":"instagram"'
