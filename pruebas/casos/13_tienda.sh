@@ -99,7 +99,13 @@ stock_de 101; ANTES=$STOCK
 pedir POST /api/tienda/carrito/confirmar
 esperar "Confirmar crea la factura V-… pendiente de pago" 201 '"estado":"PENDIENTE_PAGO"'
 esperar "La compra trae hasta cuándo pagar" 201 '"pagar_antes_de":"'
-esperar "  y los segundos que faltan, contados por el servidor (15 minutos)" 201 '"segundos_para_pagar":9'
+# 15 minutos son 900 segundos, pero entre que se crea y se responde puede pasar un segundo (899):
+# se acepta un margen chico, para que la prueba no dependa del reloj.
+COMPRA=$RESPUESTA
+SEGUNDOS=$(printf '%s' "$COMPRA" | grep -o '"segundos_para_pagar":[0-9]*' | cut -d: -f2)
+if [ "${SEGUNDOS:-0}" -ge 880 ] && [ "${SEGUNDOS:-0}" -le 900 ]; then RESPUESTA="en rango ($SEGUNDOS)"; else RESPUESTA="fuera de rango: $COMPRA"; fi
+esperar "  y los segundos que faltan, contados por el servidor (15 minutos)" 201 'en rango'
+RESPUESTA=$COMPRA
 NUMERO=$(printf '%s' "$RESPUESTA" | grep -o '"numero":"V-[0-9]*"' | cut -d'"' -f4)
 stock_de 101
 [ "$STOCK" -eq $((ANTES - 5)) ] && echo "  ok     Confirmar reserva el stock ($ANTES -> $STOCK)" || { echo "  FALLA  el stock no bajó 5 ($ANTES -> $STOCK)"; FALLAS=$((FALLAS+1)); }
@@ -197,8 +203,8 @@ pedir GET '/api/inventario/compras?buscar=101'
 esperar "Buscar por los últimos dígitos del número encuentra el pedido" 200 '"V-000101"'
 pedir GET '/api/inventario/compras?buscar=V-000101'
 esperar "Buscar por el número completo también" 200 '"V-000101"'
-pedir GET '/api/inventario/compras?buscar=cliente%20de%20prueba'
-esperar "Buscar por el nombre del comprador (sin importar mayúsculas)" 200 '"comprador":"Cliente de Prueba"'
+pedir GET '/api/inventario/compras?buscar=sof%C3%ADa%20ben%C3%ADtez'
+esperar "Buscar por el nombre del comprador (sin importar mayúsculas)" 200 '"comprador":"Sofía Benítez"'
 pedir GET '/api/inventario/compras?buscar=V-000102'
 esperar "El buscador busca dentro de la pestaña (V-000102 está entregado)" 200 '"datos":[]'
 pedir GET '/api/inventario/compras?buscar=%25'
@@ -220,7 +226,7 @@ pedir POST /api/tienda/compras/V-999999/entregada
 esperar "Una compra que no existe da 404" 404
 pedir GET '/api/inventario/compras?estado=ENTREGADA'
 esperar "En Entregados aparece primero la más reciente" 200 '"datos":[{"numero":"V-000101"'
-esperar "  con qué veterinaria la entregó" 200 '"entregada_por":"Veterinaria de Prueba"'
+esperar "  con qué veterinaria la entregó" 200 '"entregada_por":"Dra. Laura Martínez"'
 pedir GET /api/inventario/compras
 if printf '%s' "$RESPUESTA" | grep -q '"V-000101"'; then echo "  FALLA  la entregada sigue en pedidos para retirar"; FALLAS=$((FALLAS+1)); else echo "  ok     La entregada ya no está en pedidos para retirar"; fi
 TOTAL=$((TOTAL+1))
