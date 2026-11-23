@@ -136,6 +136,8 @@ esperar "La foto de una publicación disponible es pública" 200
 iniciar_sesion vet@prueba.huellavet 'Vet-Prueba-2026'
 pedir GET /api/adopciones/moderacion
 esperar "La veterinaria ve las publicaciones por moderar" 200 '"titulo":"Canela busca familia"'
+pedir GET /api/notificaciones
+esperar "Y le llegó el aviso de la publicación nueva" 200 'publicó a Canela para adopción'
 pedir POST /api/adopciones/publicaciones/102/rechazar '{"motivo":""}'
 esperar "Rechazar sin motivo da 400" 400 '"motivo"'
 pedir POST /api/adopciones/publicaciones/102/rechazar '{"motivo":"La foto no se ve bien"}'
@@ -175,6 +177,8 @@ esperar "Un cliente no completa adopciones (403)" 403
 iniciar_sesion rescatista@prueba.huellavet 'Rescatista-Prueba-2026'
 pedir GET /api/notificaciones
 esperar "A la rescatista le llega el aviso de la postulación" 200 'Cliente Dos se postuló para adoptar a Pipa'
+esperar "Y el de la publicación aprobada" 200 'Aprobamos la publicación de Canela'
+esperar "Y el de la rechazada, con el motivo" 200 'No aprobamos la publicación de Rocco. Motivo: La foto no se ve bien'
 pedir GET /api/adopciones/101/postulaciones
 esperar "La rescatista ve los postulantes de Pipa, sin su teléfono" 200 '"telefono":null'
 pedir POST /api/adopciones/101/elegir '{}'
@@ -234,6 +238,12 @@ pedir GET '/api/adopciones?desde=2026-11-19&hasta=2026-11-01'
 esperar "Hasta antes que desde da 400" 400 '"hasta"'
 pedir GET '/api/adopciones?por_pagina=101'
 esperar "Más de 100 por página da 400" 400 '"por_pagina"'
+pedir GET '/api/adopciones?orden=prioridad'
+esperar "Se ordena por prioridad" 200 '"adopciones":['
+pedir GET '/api/adopciones?estado=FINALIZADA&orden=antiguas'
+esperar "O de la más antigua a la más nueva" 200 '"nombre":"Pipa"'
+pedir GET '/api/adopciones?orden=cualquiera'
+esperar "Un orden que no existe da 400" 400 '"orden"'
 pedir GET /api/adopciones/101/detalle
 esperar "La veterinaria ve el detalle de la adopción" 200 '"postulaciones":['
 esperar "Con la consulta del chequeo" 200 "\"consulta_id\":${CONSULTA_CHEQUEO:-0}"
