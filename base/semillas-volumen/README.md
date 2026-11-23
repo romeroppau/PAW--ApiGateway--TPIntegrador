@@ -49,6 +49,7 @@ a una de sus adopciones) se deshace al recargar.
 | 004 | 12 adopciones finalizadas: 2 hace exactamente 30 días y 2 hace 90 | (turnos de chequeo 20801 a 20840) | Controles de adopción del motor |
 | 005 | 150 compras (30 del cliente de prueba 102): pagadas, entregadas y canceladas | 20001 a 20150 (V-020001...) | Mis compras de a 20, Ventas con filtros, facturas |
 | 006 | 200 avisos web, mitad para la veterinaria 101 y mitad para el cliente 102; los 12 más nuevos sin leer | 20001 a 20200 | La campana y su paginación |
+| 007 | Fotos de las 122 mascotas: 7 de perro y 6 de gato (Unsplash), rotando por especie | las mascotas de 001 | Listas de mascotas y la ficha de la mascota con foto |
 
 ## Cuentas
 

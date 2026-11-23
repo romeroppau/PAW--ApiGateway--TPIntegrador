@@ -58,6 +58,8 @@ vence en 20 días (la fecha se calcula desde hoy cada vez que se cargan las semi
 | 103 | Luna | Perro | 103 (`cliente2@`) | 10 semanas (cachorra) |
 | 104 | Tom | Gato | 103 (`cliente2@`) | 2 años |
 
+Todas tienen foto (semilla 012, fotos de Unsplash con licencia libre): Firulais, Michi, Luna, Tom, Canela, Pipa, Rocco y Simba.
+
 ## Turnos
 
 Todos con la veterinaria 101 (`vet@prueba.huellavet`). "Hoy" es la fecha de Argentina.
