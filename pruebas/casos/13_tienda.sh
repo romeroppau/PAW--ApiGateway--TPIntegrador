@@ -99,7 +99,13 @@ stock_de 101; ANTES=$STOCK
 pedir POST /api/tienda/carrito/confirmar
 esperar "Confirmar crea la factura V-… pendiente de pago" 201 '"estado":"PENDIENTE_PAGO"'
 esperar "La compra trae hasta cuándo pagar" 201 '"pagar_antes_de":"'
-esperar "  y los segundos que faltan, contados por el servidor (15 minutos)" 201 '"segundos_para_pagar":9'
+# 15 minutos son 900 segundos, pero entre que se crea y se responde puede pasar un segundo (899):
+# se acepta un margen chico, para que la prueba no dependa del reloj.
+COMPRA=$RESPUESTA
+SEGUNDOS=$(printf '%s' "$COMPRA" | grep -o '"segundos_para_pagar":[0-9]*' | cut -d: -f2)
+if [ "${SEGUNDOS:-0}" -ge 880 ] && [ "${SEGUNDOS:-0}" -le 900 ]; then RESPUESTA="en rango ($SEGUNDOS)"; else RESPUESTA="fuera de rango: $COMPRA"; fi
+esperar "  y los segundos que faltan, contados por el servidor (15 minutos)" 201 'en rango'
+RESPUESTA=$COMPRA
 NUMERO=$(printf '%s' "$RESPUESTA" | grep -o '"numero":"V-[0-9]*"' | cut -d'"' -f4)
 stock_de 101
 [ "$STOCK" -eq $((ANTES - 5)) ] && echo "  ok     Confirmar reserva el stock ($ANTES -> $STOCK)" || { echo "  FALLA  el stock no bajó 5 ($ANTES -> $STOCK)"; FALLAS=$((FALLAS+1)); }
