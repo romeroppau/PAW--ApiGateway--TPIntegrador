@@ -22,12 +22,12 @@ esperar "Un cliente no la cambia (403)" 403
 iniciar_sesion vet@prueba.huellavet 'Vet-Prueba-2026'
 
 # Se parte de los valores por defecto (en dev alguien pudo haberlos cambiado desde el panel).
-VALORES_POR_DEFECTO='{"valores":{"hora_apertura":"08:00","hora_cierre":"20:00","dias_aviso_vacuna":7,"dias_control_adopcion_1":30,"dias_control_adopcion_2":90,"limite_stock_bajo":10,"dias_liquidar":30}}'
+VALORES_POR_DEFECTO='{"valores":{"hora_apertura":"08:00","hora_cierre":"20:00","hora_apertura_2":"","hora_cierre_2":"","dias_aviso_vacuna":7,"dias_control_adopcion_1":30,"dias_control_adopcion_2":90,"limite_stock_bajo":10,"dias_liquidar":30}}'
 pedir PUT /api/configuracion "$VALORES_POR_DEFECTO"
 esperar "La veterinaria vuelve todo a los valores por defecto" 200 '"parametros":['
 
 pedir GET /api/configuracion
-esperar "Ve los parámetros con su nombre" 200 '"nombre":"Apertura"'
+esperar "Ve los parámetros con su nombre" 200 '"nombre":"Primer horario: desde"'
 esperar "Con su valor y su valor por defecto" 200 '"defecto":"08:00","valor":"08:00","modificado":false'
 
 CSRF_REAL=$CSRF; CSRF="no-es-el-token"
@@ -58,6 +58,18 @@ esperar "El horario de atención ahora empieza a las 9" 200 '"apertura":"09:00",
 MANIANA=$(date -d '+1 day' +%F)
 pedir POST /api/pacientes/turnos "{\"mascota_id\":101,\"fecha\":\"$MANIANA\",\"hora\":\"08:30\",\"motivo\":\"CONSULTA\"}"
 esperar "Un turno a las 8:30 ya no se puede dar" 400 'El horario de atención es de 09:00 a 20:00'
+
+# Horario cortado: de 9 a 13 y de 16 a 19 (y de vuelta a 9 a 20 al final, con el resto).
+pedir PUT /api/configuracion '{"valores":{"hora_cierre":"19:00","hora_apertura_2":"16:00"}}'
+esperar "El segundo horario va con sus dos horas (400)" 400 '"hora_cierre_2":"Completá las dos horas'
+pedir PUT /api/configuracion '{"valores":{"hora_cierre":"13:00","hora_apertura_2":"16:00","hora_cierre_2":"19:00"}}'
+esperar "La veterinaria corta el horario: de 9 a 13 y de 16 a 19" 200 '"clave":"hora_apertura_2"'
+pedir GET /api/pacientes/horario
+esperar "El horario público trae las dos franjas" 200 '"franjas":[{"apertura":"09:00","cierre":"13:00"},{"apertura":"16:00","cierre":"19:00"}]'
+pedir POST /api/pacientes/turnos "{\"mascota_id\":101,\"fecha\":\"$MANIANA\",\"hora\":\"14:00\",\"motivo\":\"CONSULTA\"}"
+esperar "Un turno en el corte del mediodía no se puede dar" 400 'El horario de atención es de 09:00 a 13:00 y de 16:00 a 19:00'
+pedir PUT /api/configuracion '{"valores":{"hora_apertura":"00:00","hora_cierre":"23:59","hora_apertura_2":"","hora_cierre_2":""}}'
+esperar "Y se puede atender las 24 horas" 200 '"valor":"23:59"'
 
 # Reportes usa el límite de stock nuevo.
 pedir GET /api/reportes/stock
