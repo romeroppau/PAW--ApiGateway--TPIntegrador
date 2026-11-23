@@ -8,6 +8,8 @@ pedir GET /api/configuracion
 esperar "Sin sesión no se ve la configuración (401)" 401
 pedir GET /api/pacientes/horario
 esperar "El horario de atención es público (lo muestra la portada)" 200 '"apertura":'
+pedir GET /api/configuracion/contacto
+esperar "Los datos de la veterinaria son públicos (los muestra el pie de todas las páginas)" 200 '"enlaces":{"telefono":"tel:+54'
 
 es_entorno_de_prueba || return 0
 
@@ -68,3 +70,18 @@ pedir GET /api/pacientes/horario
 esperar "El horario vuelve a ser de 8 a 20" 200 '"apertura":"08:00","cierre":"20:00"'
 pedir GET /api/reportes/stock
 esperar "Y el límite de stock, 10" 200 '"limite_stock_bajo":10'
+
+# Datos de la veterinaria: los carga en Configuración y los ve cualquiera, sin sesión.
+pedir PUT /api/configuracion '{"valores":{"whatsapp":"2323 555-555","instagram":"https://www.instagram.com/huellavet"}}'
+esperar "La veterinaria carga su WhatsApp y su Instagram" 200 '"clave":"instagram"'
+pedir PUT /api/configuracion '{"valores":{"facebook":"https://www.instagram.com/huellavet","telefono":"123"}}'
+esperar "Una red con un enlace de otro sitio da 400 en ese campo" 400 '"campos":{"facebook":"Tiene que ser un enlace https de facebook.com'
+esperar "  y un teléfono que no es, en el suyo" 400 '"telefono":"El teléfono no es válido'
+cerrar_sesion
+pedir GET /api/configuracion/contacto
+esperar "Sin sesión se ve el WhatsApp nuevo, con su enlace armado" 200 'wa.me\/5492323555555"'
+esperar "  y el Instagram" 200 '"instagram":"https:\/\/www.instagram.com\/huellavet"'
+esperar "  y lo no cargado va vacío (no se muestra)" 200 '"facebook":null'
+iniciar_sesion vet@prueba.huellavet 'Vet-Prueba-2026'
+pedir PUT /api/configuracion '{"valores":{"whatsapp":"11 3901-0486","instagram":""}}'
+esperar "Vuelven a como estaban" 200 '"clave":"instagram"'
