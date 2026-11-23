@@ -5,18 +5,22 @@
 es_entorno_de_prueba || return 0
 
 EMAIL_NUEVO="mis-datos-$(date +%s)-$RANDOM@prueba.huellavet"
+# Teléfono distinto en cada corrida: la verificación del WhatsApp limita los códigos por número.
+TEL_MD="11555$(printf '%05d' $((RANDOM % 100000)))"
 
 # --- Mis datos: sin sesión ---
 pedir GET /api/cuenta
 esperar "Mis datos piden sesión (401)" 401
 
-# --- Una cuenta nueva de cliente ---
-pedir POST /api/auth/registro/cliente "{\"nombre\":\"Cuenta Mis Datos\",\"email\":\"$EMAIL_NUEVO\",\"password\":\"Clave-Vieja-2026\",\"telefono\":\"1155550100\"}"
+# --- Una cuenta nueva de cliente (con el código del WhatsApp: en local y en el CI la respuesta lo trae) ---
+pedir POST /api/auth/registro/codigo "{\"telefono\":\"$TEL_MD\"}"
+COD_MD=$(printf '%s' "$RESPUESTA" | grep -o '"codigo":"[0-9]*"' | cut -d'"' -f4)
+pedir POST /api/auth/registro/cliente "{\"nombre\":\"Cuenta Mis Datos\",\"email\":\"$EMAIL_NUEVO\",\"password\":\"Clave-Vieja-2026\",\"telefono\":\"$TEL_MD\",\"codigo\":\"$COD_MD\"}"
 esperar "Se registra una cuenta para probar Mis datos" 201
 iniciar_sesion "$EMAIL_NUEVO" 'Clave-Vieja-2026'
 
 pedir GET /api/cuenta
-esperar "Mis datos muestra el nombre, el email y el teléfono" 200 '"nombre":"Cuenta Mis Datos","email":"'"$EMAIL_NUEVO"'","telefono":"1155550100","rol":"CLIENTE"'
+esperar "Mis datos muestra el nombre, el email y el teléfono" 200 '"nombre":"Cuenta Mis Datos","email":"'"$EMAIL_NUEVO"'","telefono":"'"$TEL_MD"'","rol":"CLIENTE"'
 
 CSRF_REAL=$CSRF; CSRF="no-es-el-token"
 pedir PUT /api/cuenta '{"nombre":"Otro Nombre","telefono":"1155550101"}'
@@ -24,11 +28,11 @@ esperar "Cambiar los datos sin el token CSRF da 403" 403
 CSRF=$CSRF_REAL
 
 pedir PUT /api/cuenta '{"nombre":"Cuenta Cambiada","telefono":"+54 9 11 5555-0102","email":"otro@prueba.huellavet"}'
-esperar "Cambia el nombre y el teléfono (el teléfono queda en 10 dígitos)" 200 '"nombre":"Cuenta Cambiada","email":"'"$EMAIL_NUEVO"'","telefono":"1155550102"'
+esperar "Cambia el nombre; el email y el teléfono no (el teléfono, solo verificándolo por WhatsApp)" 200 '"nombre":"Cuenta Cambiada","email":"'"$EMAIL_NUEVO"'","telefono":"'"$TEL_MD"'"'
 pedir GET /api/auth/yo
 esperar "  el nombre nuevo se ve enseguida en la sesión" 200 '"nombre":"Cuenta Cambiada"'
 pedir PUT /api/cuenta '{"nombre":"A","telefono":""}'
-esperar "Datos inválidos: un mensaje por campo (400)" 400 '"telefono":"El teléfono es obligatorio"'
+esperar "Datos inválidos: un mensaje por campo (400)" 400 '"nombre":"El nombre debe tener entre 2 y 100 caracteres"'
 
 # --- Cambiar la contraseña ---
 pedir PUT /api/cuenta/contrasena '{"actual":"no-es-la-mia","nueva":"Clave-Nueva-2026","repetir":"Clave-Nueva-2026"}'
@@ -45,7 +49,7 @@ esperar "Con la contraseña vieja ya no se entra (401)" 401
 pedir POST /api/auth/login "{\"email\":\"$EMAIL_NUEVO\",\"password\":\"Clave-Nueva-2026\"}"
 esperar "Con la nueva sí" 200 '"nombre":"Cuenta Cambiada"'
 
-# --- El rescatista también cambia su organización; la veterinaria puede no tener teléfono ---
+# --- El rescatista también cambia su organización; la veterinaria no cambia el teléfono con "Guardar" ---
 iniciar_sesion rescatista@prueba.huellavet 'Rescatista-Prueba-2026'
 pedir GET /api/cuenta
 ORIGINAL=$(printf '%s' "$RESPUESTA")
@@ -61,8 +65,7 @@ pedir GET /api/cuenta
 NOMBRE_V=$(printf '%s' "$RESPUESTA" | grep -o '"nombre":"[^"]*"' | cut -d'"' -f4)
 TEL_V=$(printf '%s' "$RESPUESTA" | grep -o '"telefono":"[^"]*"' | cut -d'"' -f4)
 pedir PUT /api/cuenta "{\"nombre\":\"$NOMBRE_V\",\"telefono\":\"\"}"
-esperar "La veterinaria puede dejar el teléfono vacío" 200 '"telefono":null,"rol":"VETERINARIO"'
-pedir PUT /api/cuenta "{\"nombre\":\"$NOMBRE_V\",\"telefono\":\"$TEL_V\"}"
+esperar "La veterinaria tampoco cambia el teléfono con Guardar" 200 "\"telefono\":$([ -n "$TEL_V" ] && echo "\"$TEL_V\"" || echo null),\"rol\":\"VETERINARIO\""
 
 # --- Clientes (veterinaria) ---
 pedir GET /api/clientes
