@@ -251,12 +251,15 @@ pedir GET /api/pacientes/mascotas/902/historial
 esperar "Con el chequeo en su historial" 200 'Chequeo de adopción'
 pedir GET /api/notificaciones
 esperar "Al adoptante le llegó el aviso de que lo eligieron" 200 'Te eligieron para adoptar a Pipa'
+esperar "Y el del turno del chequeo" 200 'Tenés turno para el chequeo de adopción de Pipa'
 esperar "Y el de la adopción completa" 200 'La adopción de Pipa está completa'
 iniciar_sesion rescatista@prueba.huellavet 'Rescatista-Prueba-2026'
 pedir GET /api/pacientes/mascotas/902
 esperar "La rescatista ya no tiene a Pipa (404)" 404
 pedir GET /api/adopciones/101/detalle
 esperar "Pero ve el detalle de su adopción" 200 '"estado":"FINALIZADA"'
+pedir GET /api/notificaciones
+esperar "A la rescatista le llegó el aviso del turno del chequeo" 200 'tiene turno para el chequeo de adopción de Pipa'
 
 # --- Cancelar ---
 pedir POST "/api/adopciones/${ADOPCION_CANELA:-0}/cancelar"
