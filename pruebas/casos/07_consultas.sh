@@ -35,14 +35,13 @@ pedir PUT "/api/pacientes/consultas/$CONSULTA" '{"diagnostico":"No debería guar
 esperar "Guardar sin el token CSRF correcto da 403" 403
 CSRF=$CSRF_REAL
 
-pedir PUT "/api/pacientes/consultas/$CONSULTA" '{"valor_base":-5}'
-esperar "Un valor base negativo da 400" 400
+# El valor de la consulta sale del precio del turno (migración 020): no se cambia a mano.
+# El turno 101 es de las semillas (sin precio guardado): toma el precio base de la configuración.
+pedir PUT "/api/pacientes/consultas/$CONSULTA" '{"valor_base":8000}'
+esperar "El valor de la consulta no se cambia a mano (400)" 400 'sale del precio del turno'
 
-pedir PUT "/api/pacientes/consultas/$CONSULTA" '{"valor_base":100000000}'
-esperar "Un valor base mayor al máximo da 400" 400
-
-pedir PUT "/api/pacientes/consultas/$CONSULTA" '{"diagnostico":"Control general","valor_base":8000}'
-esperar "La veterinaria guarda diagnóstico y valor base" 200 '"valor_base":"8000.00"'
+pedir PUT "/api/pacientes/consultas/$CONSULTA" '{"diagnostico":"Control general"}'
+esperar "La veterinaria guarda el diagnóstico; el valor es el precio base" 200 '"valor_base":"15000.00"'
 
 # --- Insumos ---
 pedir POST "/api/pacientes/consultas/$CONSULTA/insumos" '{"insumo_id":101,"cantidad":0}'
