@@ -8,6 +8,8 @@ pedir GET /api/notificaciones
 esperar "Sin sesión no se ven las notificaciones (401)" 401
 pedir POST /api/notificaciones/1/leida
 esperar "Sin sesión no se marca una notificación (401)" 401
+pedir GET /api/notificaciones/historial
+esperar "Sin sesión no se ve el historial (401)" 401
 
 # /internal/ es de proceso a proceso: desde afuera tiene que estar bloqueado.
 pedir POST /internal/notificaciones '{"usuario_id":1,"tipo":"VACUNA","canal":"WEB","mensaje":"x","fecha_programada":"2026-01-01 10:00:00","id_operacion":"humo-afuera"}'
@@ -56,6 +58,43 @@ pedir POST /api/notificaciones/901/leida
 esperar "El cliente marca su aviso como leído" 200 '"leida":true'
 pedir POST /api/notificaciones/901/leida
 esperar "Marcarlo de nuevo también da 200" 200
+
+# --- La campana muestra solo los sin leer (hasta 10); el historial, todos ---
+pedir GET /api/notificaciones
+if printf '%s' "$RESPUESTA" | grep -q 'Aviso de prueba'; then
+  echo "  FALLA  el aviso leído sigue en la campana"; FALLAS=$((FALLAS + 1))
+else
+  echo "  ok     Ya leído, el aviso deja la campana"
+fi
+TOTAL=$((TOTAL + 1))
+LEIDAS=$(printf '%s' "$RESPUESTA" | grep -o '"leida":true' | wc -l | tr -d ' ')
+CUANTOS=$(printf '%s' "$RESPUESTA" | grep -o '"id":[0-9]*' | wc -l | tr -d ' ')
+TOTAL=$((TOTAL + 1))
+if [ "$LEIDAS" -eq 0 ] && [ "$CUANTOS" -le 10 ]; then echo "  ok     La campana trae solo sin leer, hasta 10 ($CUANTOS)"; else echo "  FALLA  la campana trae $CUANTOS avisos, $LEIDAS leídos"; FALLAS=$((FALLAS + 1)); fi
+
+pedir GET '/api/notificaciones/historial?estado=LEIDAS'
+esperar "El historial tiene el aviso leído" 200 'Aviso de prueba'
+esperar "  de a 20, con las fechas que usó (los últimos 30 días)" 200 '"por_pagina":20'
+pedir GET '/api/notificaciones/historial?estado=SIN_LEER'
+if printf '%s' "$RESPUESTA" | grep -q 'Aviso de prueba'; then echo "  FALLA  el filtro Sin leer trae el leído"; FALLAS=$((FALLAS + 1)); else echo "  ok     Con el filtro Sin leer, no está"; fi
+TOTAL=$((TOTAL + 1))
+pedir GET '/api/notificaciones/historial?desde=2020-01-01&hasta=2020-01-31'
+esperar "Entre dos fechas sin avisos, vacío" 200 '"datos":[]'
+pedir GET '/api/notificaciones/historial?estado=CUALQUIERA'
+esperar "Un estado inválido da 400" 400 '"estado"'
+pedir GET '/api/notificaciones/historial?desde=2020-02-01&hasta=2020-01-01'
+esperar "Desde después de hasta da 400" 400 '"desde"'
+
+# --- Marcar todas como leídas ---
+CSRF_CLIENTE=$CSRF
+CSRF=""
+pedir POST /api/notificaciones/leidas
+esperar "Marcar todas sin el token CSRF da 403" 403
+CSRF=$CSRF_CLIENTE
+pedir POST /api/notificaciones/leidas
+esperar "Marcar todas como leídas" 200 '"no_leidas":0'
+pedir GET /api/notificaciones
+esperar "  y la campana queda vacía" 200 '"no_leidas":0,"datos":[]'
 
 cerrar_sesion
 
