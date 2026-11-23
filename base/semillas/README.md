@@ -22,14 +22,16 @@ juego aparte, que se carga a mano después de estas: `base/semillas-volumen/READ
 
 Son de prueba y no existen en producción, por eso las contraseñas están acá.
 
-| Id | Rol | Email | Contraseña |
-|---|---|---|---|
-| 101 | Veterinario | `vet@prueba.huellavet` | `Vet-Prueba-2026` |
-| 102 | Cliente | `cliente@prueba.huellavet` | `Cliente-Prueba-2026` |
-| 103 | Cliente | `cliente2@prueba.huellavet` | `Cliente-Prueba-2026` |
-| 104 | Rescatista (aprobado) | `rescatista@prueba.huellavet` | `Rescatista-Prueba-2026` |
-| 105 | Rescatista (pendiente) | `rescatista2@prueba.huellavet` | `Rescatista-Prueba-2026` |
-| 120 a 124 | Clientes que escribieron las reseñas de ejemplo (semilla 011): Lucía Fernández, Martín Gómez, Carolina Pérez, Julián Sosa y Valeria Ríos | `lucia@resenas.huellavet`, `martin@…`, `carolina@…`, `julian@…`, `valeria@…` | `Cliente-Prueba-2026` |
+Tienen nombres de personas, para que en una demo no se vea "Cliente de Prueba".
+
+| Id | Nombre | Rol | Email | Contraseña |
+|---|---|---|---|---|
+| 101 | Dra. Laura Martínez | Veterinario | `vet@prueba.huellavet` | `Vet-Prueba-2026` |
+| 102 | Sofía Benítez | Cliente | `cliente@prueba.huellavet` | `Cliente-Prueba-2026` |
+| 103 | Tomás Aguirre | Cliente | `cliente2@prueba.huellavet` | `Cliente-Prueba-2026` |
+| 104 | Paula Herrera (Refugio Huellitas) | Rescatista (aprobado) | `rescatista@prueba.huellavet` | `Rescatista-Prueba-2026` |
+| 105 | Nicolás Medina (Patitas al Rescate) | Rescatista (pendiente) | `rescatista2@prueba.huellavet` | `Rescatista-Prueba-2026` |
+| 120 a 124 | Lucía Fernández, Martín Gómez, Carolina Pérez, Julián Sosa y Valeria Ríos | Clientes (escribieron las reseñas de ejemplo, semilla 011) | `lucia@resenas.huellavet`, `martin@…`, `carolina@…`, `julian@…`, `valeria@…` | `Cliente-Prueba-2026` |
 
 ## Productos
 
