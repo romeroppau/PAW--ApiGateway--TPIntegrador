@@ -7,7 +7,7 @@ cerrar_sesion
 pedir GET /api/configuracion
 esperar "Sin sesión no se ve la configuración (401)" 401
 pedir GET /api/pacientes/horario
-esperar "Sin sesión no se ve el horario de atención (401)" 401
+esperar "El horario de atención es público (lo muestra la portada)" 200 '"apertura":'
 
 es_entorno_de_prueba || return 0
 
