@@ -176,7 +176,7 @@ esperar "Un cliente no completa adopciones (403)" 403
 # --- Elegir al adoptante (rescatista) ---
 iniciar_sesion rescatista@prueba.huellavet 'Rescatista-Prueba-2026'
 pedir GET /api/notificaciones
-esperar "A la rescatista le llega el aviso de la postulación" 200 'Cliente Dos se postuló para adoptar a Pipa'
+esperar "A la rescatista le llega el aviso de la postulación" 200 'Tomás Aguirre se postuló para adoptar a Pipa'
 esperar "Y el de la publicación aprobada" 200 'Aprobamos la publicación de Canela'
 esperar "Y el de la rechazada, con el motivo" 200 'No aprobamos la publicación de Rocco. Motivo: La foto no se ve bien'
 pedir GET /api/adopciones/101/postulaciones

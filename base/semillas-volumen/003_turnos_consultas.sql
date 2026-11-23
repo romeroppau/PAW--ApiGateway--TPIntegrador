@@ -9,6 +9,7 @@
 --   semana. Una de cada tres usa un insumo (101) y una de cada cuatro vende un producto (105).
 --   Vacunas 20001 a 20030: antirrábica pendiente para los próximos 0 a 9 días (el aviso del motor
 --   avisa las de los próximos 7).
+--   Los lunes a la tarde quedan CANCELADO: es la franja sin turnos, que el motor sugiere promocionar.
 -- Correr de nuevo deja todo como estaba, con las fechas corridas a hoy.
 
 SET @hoy = DATE(UTC_TIMESTAMP() - INTERVAL 3 HOUR);
@@ -46,6 +47,9 @@ SELECT 20000 + i,
        SEC_TO_TIME(9 * 3600 + lugar * 1800),
        IF(i % 5 = 0, 'VACUNACION', 'CONSULTA'),
        CASE
+         -- Los lunes a la tarde (desde las 13:00) quedan sin turnos: así el motor sugiere esa franja
+         -- para promocionarla y se puede probar un turno con descuento un lunes a la tarde o a la noche.
+         WHEN DAYOFWEEK(@hoy + INTERVAL dia DAY) = 2 AND lugar >= 8 THEN 'CANCELADO'
          WHEN i % 10 = 0 THEN 'CANCELADO'
          WHEN dia > 0 THEN 'PROGRAMADO'
          WHEN dia = 0 THEN IF(lugar < 6, 'ATENDIDO', 'PROGRAMADO')
