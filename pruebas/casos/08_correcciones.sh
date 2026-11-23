@@ -26,8 +26,8 @@ pedir POST /api/pacientes/turnos/102/atencion
 esperar "Se atiende el turno 102" 201 '"estado":"ABIERTA"'
 CONSULTA=$(printf '%s' "$RESPUESTA" | sed -n 's/^{"consulta":{"id":\([0-9]*\).*/\1/p')
 
-pedir PUT "/api/pacientes/consultas/$CONSULTA" '{"diagnostico":"Vacunacion de rutina","valor_base":9000}'
-esperar "Se guarda el diagnóstico" 200 '"valor_base":"9000.00"'
+pedir PUT "/api/pacientes/consultas/$CONSULTA" '{"diagnostico":"Vacunacion de rutina"}'
+esperar "Se guarda el diagnóstico" 200 '"diagnostico":"Vacunacion de rutina"'
 
 pedir POST "/api/pacientes/consultas/$CONSULTA/insumos" "{\"insumo_id\":$INSUMO,\"cantidad\":2}"
 esperar "Se agrega el insumo a la consulta" 201 '"cantidad":2'
@@ -46,23 +46,26 @@ pedir DELETE "/api/pacientes/consultas/$CONSULTA/insumos/$ITEM"
 esperar "Se quita el insumo de la consulta" 200 '"insumos":[]'
 
 # --- El total de la factura tiene que entrar en la columna, y se valida antes de descontar ---
-pedir PUT "/api/pacientes/consultas/$CONSULTA" '{"valor_base":99999999.99}'
-esperar "El valor base máximo se acepta" 200 '"valor_base":"99999999.99"'
+# (El valor de la consulta ya no se edita: se pasa del máximo con un insumo carísimo.)
+pedir POST /api/inventario/insumos '{"nombre":"Insumo muy caro","costo":99999999,"stock":10}'
+esperar "Se crea un insumo carísimo para la prueba" 201 '"stock":10'
+CARO=$(printf '%s' "$RESPUESTA" | grep -o '"id":[0-9]*' | head -1 | cut -d: -f2)
 
-pedir GET /api/inventario/insumos/101
-STOCK=$(printf '%s' "$RESPUESTA" | grep -o '"stock":[0-9]*' | head -1)
-
-pedir POST "/api/pacientes/consultas/$CONSULTA/insumos" '{"insumo_id":101,"cantidad":1}'
-esperar "Se agrega una jeringa" 201 '"insumo_id":101'
+pedir POST "/api/pacientes/consultas/$CONSULTA/insumos" "{\"insumo_id\":$CARO,\"cantidad\":2}"
+esperar "Se agregan dos" 201 "\"insumo_id\":$CARO"
+ITEM_CARO=$(printf '%s' "$RESPUESTA" | grep -o '"id":[0-9]*,"insumo_id":'"$CARO" | head -1 | cut -d: -f2 | cut -d, -f1)
 
 pedir POST "/api/pacientes/consultas/$CONSULTA/finalizar"
 esperar "Si el total no entra en la factura da 400, no 500" 400 'El total de la consulta'
 
-pedir GET /api/inventario/insumos/101
-esperar "El stock de la jeringa no cambió" 200 "$STOCK"
+pedir GET "/api/inventario/insumos/$CARO"
+esperar "El stock del insumo no cambió" 200 '"stock":10'
 
-pedir PUT "/api/pacientes/consultas/$CONSULTA" '{"valor_base":9000}'
-esperar "Se corrige el valor base" 200 '"valor_base":"9000.00"'
+pedir DELETE "/api/pacientes/consultas/$CONSULTA/insumos/$ITEM_CARO"
+esperar "Se quita el insumo carísimo" 200 '"insumos":[]'
+pedir DELETE "/api/inventario/insumos/$CARO"
+pedir POST "/api/pacientes/consultas/$CONSULTA/insumos" '{"insumo_id":101,"cantidad":1}'
+esperar "Se agrega una jeringa" 201 '"insumo_id":101'
 
 pedir POST "/api/pacientes/consultas/$CONSULTA/finalizar"
 esperar "Con el total corregido, finaliza" 200 '"numero":"C-'
