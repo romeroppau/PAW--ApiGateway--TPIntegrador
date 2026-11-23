@@ -42,7 +42,7 @@ a una de sus adopciones) se deshace al recargar.
 | 001 | Veterinario Dos, 40 clientes y 5 rescatistas aprobados (`@volumen.huellavet`, sin teléfono) | 2001 a 2046 | Búsquedas, listas largas |
 | 001 | 80 mascotas de los clientes, 2 más del cliente de prueba 102, 40 de los rescatistas | 20001 a 20082, 20101 a 20140 | Mis mascotas, adopciones |
 | 002 | 30 productos: 10 por vencer, 8 con stock bajo, 12 normales; 180 cargas de stock | 2001 a 2030 | Qué liquidar y Publicitar, stock bajo, Movimientos |
-| 003 | 760 turnos: 4 por día desde hace 180 días hasta dentro de 9, con el Veterinario Dos | 20001 a 20760 | Agenda, Mis turnos, Turnos atendidos, sugerencia de franjas |
+| 003 | 760 turnos: 4 por día desde hace 180 días hasta dentro de 9, con el Veterinario Dos; los lunes a la tarde quedan cancelados (la franja sin turnos, que el motor sugiere promocionar) | 20001 a 20760 | Agenda, Mis turnos, Turnos atendidos, sugerencia y promoción de franjas |
 | 003 | Consulta y factura de cada turno atendido (C-020001...) | igual que su turno | Historial, facturas |
 | 003 | 30 vacunas antirrábicas sin aplicar, para los próximos 0 a 9 días | 20001 a 20030 | Aviso de vacuna próxima |
 | 004 | 40 publicaciones y adopciones en todos los estados, 83 postulaciones | 20001 a 20040 | Pestañas de adopciones, moderación, mis postulaciones |

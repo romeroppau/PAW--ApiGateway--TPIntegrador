@@ -42,7 +42,7 @@ cerrar_sesion
 
 iniciar_sesion vet@prueba.huellavet 'Vet-Prueba-2026'
 pedir GET /api/notificaciones
-esperar "A la veterinaria le llega el aviso de la reseña nueva" 200 'Nueva reseña de Cliente P. (4 estrellas)'
+esperar "A la veterinaria le llega el aviso de la reseña nueva" 200 'Nueva reseña de Sofía B. (4 estrellas)'
 pedir POST /api/resenas '{"estrellas":5,"texto":"Soy la veterinaria"}'
 esperar "La veterinaria no escribe reseñas (403)" 403
 pedir PUT "/api/resenas/$NUEVA/respuesta" '{"texto":""}'
@@ -62,7 +62,7 @@ cerrar_sesion
 
 iniciar_sesion rescatista@prueba.huellavet 'Rescatista-Prueba-2026'
 pedir POST /api/resenas '{"estrellas":5,"texto":"El rescatista también escribe."}'
-esperar "El rescatista también escribe reseñas" 201 '"autor":"Rescatista A."'
+esperar "El rescatista también escribe reseñas" 201 '"autor":"Paula H."'
 DEL_RESCATISTA=$(printf '%s' "$RESPUESTA" | grep -o '"id":[0-9]*' | head -1 | cut -d: -f2)
 pedir DELETE "/api/resenas/$DEL_RESCATISTA"
 esperar "  y la borra" 204
