@@ -189,6 +189,19 @@ esperar "Y la otra postulación queda rechazada" 200 '"estado":"RECHAZADA"'
 pedir POST /api/adopciones/101/elegir "{\"postulacion_id\":${POSTULACION_CLIENTE2:-0}}"
 esperar "No se elige dos veces (409)" 409
 
+# Pipa ya no está disponible, pero quien se postuló la sigue viendo (desde "Mis postulaciones").
+cerrar_sesion
+pedir GET /api/adopciones/publicaciones/101
+esperar "Sin sesión, una publicación que ya no está disponible da 404" 404
+iniciar_sesion cliente2@prueba.huellavet 'Cliente-Prueba-2026'
+pedir GET /api/adopciones/publicaciones/101
+esperar "El cliente elegido sigue viendo la publicación" 200 '"titulo":"Pipa busca familia"'
+pedir GET /api/adopciones/publicaciones/101/foto
+esperar "  y su foto" 200
+iniciar_sesion cliente@prueba.huellavet 'Cliente-Prueba-2026'
+pedir GET /api/adopciones/publicaciones/101
+esperar "El que no fue elegido también (se postuló)" 200 '"titulo":"Pipa busca familia"'
+
 # --- Chequeo y cierre (veterinaria) ---
 iniciar_sesion vet@prueba.huellavet 'Vet-Prueba-2026'
 pedir POST /api/adopciones/101/completar
