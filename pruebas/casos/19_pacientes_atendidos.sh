@@ -28,3 +28,10 @@ esperar "Una página 0 da 400" 400
 pedir GET /api/pacientes/mascotas/104/historial
 esperar "Y el historial de cada uno, con sus consultas" 200 '"consultas":[{"id":'
 cerrar_sesion
+
+# Los turnos ATENDIDO de la semilla 009 (los del motor) tienen su consulta finalizada: "Ver en el
+# historial" de Mis turnos no lleva a un historial vacío (24/11, Michi del cliente 102).
+iniciar_sesion cliente@prueba.huellavet 'Cliente-Prueba-2026'
+pedir GET /api/pacientes/mascotas/102/historial
+esperar "Michi, que tiene turnos atendidos, tiene consultas en su historial" 200 '"consultas":[{"id":'
+cerrar_sesion
