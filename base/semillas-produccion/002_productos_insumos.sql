@@ -6,7 +6,8 @@
 --   Insumos 3001 a 3015: los de una veterinaria (jeringas, vacunas, gasas); uno en falta y dos con stock bajo.
 --   Los productos y los insumos que ya había (de la Entrega 4, algunos repetidos) se dan de baja: no
 --   se borran, pero dejan de verse en la tienda y en las listas.
--- Correr de nuevo vuelve stock, precio y vencimiento a estos valores.
+-- Correr de nuevo vuelve stock, precio y vencimiento a estos valores, pero no cambia la foto de un
+-- producto que ya tiene una (por ejemplo, la del paquete real que subió la veterinaria).
 
 SET @hoy = DATE(UTC_TIMESTAMP() - INTERVAL 3 HOUR);
 
@@ -27,14 +28,14 @@ SET @foto_pelota = UNHEX('ffd8ffe000104a46494600010100004800480000ffe10080457869
 INSERT INTO producto
   (id, nombre, descripcion, precio, stock, categoria, especie_destino, etapa_vida, fecha_vencimiento, imagen, imagen_tipo, activo)
 VALUES
-  (3001, 'Pipeta antipulgas Frontline Plus para perros de 10 a 20 kg', 'Pipeta contra pulgas, garrapatas y piojos. Protege hasta 4 semanas. Una pipeta.', 9800.00, 14, 'MEDICAMENTO', 'PERRO', 'TODAS', @hoy + INTERVAL 6 DAY, @foto_comprimidos, 'image/jpeg', 1),
+  (3001, 'Pipeta antipulgas Frontline Plus para gatos', 'Pipeta contra pulgas, garrapatas y piojos para gatos. Protege hasta 4 semanas. Una pipeta.', 9800.00, 14, 'MEDICAMENTO', 'GATO', 'TODAS', @hoy + INTERVAL 6 DAY, @foto_comprimidos, 'image/jpeg', 1),
   (3002, 'Pipeta Revolution para gatos de 2,6 a 7,5 kg', 'Antiparasitario externo e interno de amplio espectro para gatos. Una pipeta.', 11200.00, 9, 'MEDICAMENTO', 'GATO', 'TODAS', @hoy + INTERVAL 12 DAY, @foto_comprimidos2, 'image/jpeg', 1),
   (3003, 'Alimento húmedo Whiskas pouch sabor carne x 85 g', 'Alimento completo para gatos adultos, en sobre individual.', 1150.00, 48, 'ALIMENTO', 'GATO', 'ADULTO', @hoy + INTERVAL 9 DAY, @foto_alimento_perro, 'image/jpeg', 1),
   (3004, 'Snacks dentales Pedigree Dentastix razas medianas x 7', 'Premios que ayudan a reducir el sarro. Paquete de 7 unidades.', 5200.00, 22, 'ALIMENTO', 'PERRO', 'ADULTO', @hoy + INTERVAL 15 DAY, @foto_alimento_perro, 'image/jpeg', 1),
   (3005, 'Shampoo antipulgas Osspret para perros y gatos 250 ml', 'Shampoo con piretrinas para el baño de perros y gatos de más de 3 meses.', 6900.00, 11, 'MEDICAMENTO', 'TODAS', 'TODAS', @hoy + INTERVAL 21 DAY, @foto_comprimidos2, 'image/jpeg', 1),
-  (3006, 'Vitaminas Vitamix Senior para perros x 60 comprimidos', 'Suplemento con vitaminas y condroitina para perros de más de 7 años.', 10400.00, 8, 'MEDICAMENTO', 'PERRO', 'SENIOR', @hoy + INTERVAL 27 DAY, @foto_comprimidos, 'image/jpeg', 1),
+  (3006, 'Vitaminas Vitamix para perros y gatos x 60 comprimidos', 'Suplemento vitamínico y mineral para perros y gatos.', 10400.00, 8, 'MEDICAMENTO', 'TODAS', 'TODAS', @hoy + INTERVAL 27 DAY, @foto_comprimidos, 'image/jpeg', 1),
   (3007, 'Alimento Royal Canin Mini Adult 7,5 kg', 'Alimento balanceado para perros adultos de razas pequeñas (hasta 10 kg).', 58900.00, 3, 'ALIMENTO', 'PERRO', 'ADULTO', @hoy + INTERVAL 263 DAY, @foto_alimento_perro, 'image/jpeg', 1),
-  (3008, 'Alimento Pro Plan Kitten 1,5 kg', 'Alimento para gatitos de 2 a 12 meses, con DHA para el desarrollo.', 18900.00, 0, 'ALIMENTO', 'GATO', 'CACHORRO', @hoy + INTERVAL 272 DAY, @foto_alimento_perro, 'image/jpeg', 1),
+  (3008, 'Alimento Royal Canin Kitten para gatitos 1,5 kg', 'Alimento para gatitos de 4 a 12 meses, para un crecimiento sano.', 18900.00, 0, 'ALIMENTO', 'GATO', 'CACHORRO', @hoy + INTERVAL 272 DAY, @foto_alimento_perro, 'image/jpeg', 1),
   (3009, 'Antiparasitario interno Total Full para perros de hasta 10 kg x 2', 'Comprimidos palatables contra parásitos internos. Dosis única.', 6400.00, 5, 'MEDICAMENTO', 'PERRO', 'TODAS', @hoy + INTERVAL 281 DAY, @foto_comprimidos, 'image/jpeg', 1),
   (3010, 'Rascador para gatos con poste de sisal 60 cm', 'Rascador con base de madera y poste de sisal natural de 60 cm.', 24900.00, 2, 'ACCESORIO', 'GATO', 'TODAS', NULL, @foto_rascador, 'image/jpeg', 1),
   (3011, 'Cama acolchada lavable mediana 60 x 50 cm', 'Cama con relleno siliconado y funda desmontable lavable.', 31500.00, 4, 'ACCESORIO', 'TODAS', 'TODAS', NULL, @foto_cama, 'image/jpeg', 1),
@@ -54,13 +55,16 @@ VALUES
   (3025, 'Pelota de goma maciza 7 cm', 'Pelota resistente para morder y buscar. Flota en el agua.', 4300.00, 40, 'ACCESORIO', 'PERRO', 'TODAS', NULL, @foto_pelota, 'image/jpeg', 1),
   (3026, 'Soga de algodón para tirar 30 cm', 'Juguete de algodón trenzado: ayuda a la limpieza de los dientes.', 5100.00, 33, 'ACCESORIO', 'PERRO', 'TODAS', NULL, @foto_juguete_soga, 'image/jpeg', 1),
   (3027, 'Ratones de peluche con catnip x 2', 'Juguetes livianos con hierba gatera para estimular el juego.', 3600.00, 35, 'ACCESORIO', 'GATO', 'TODAS', NULL, @foto_rascador, 'image/jpeg', 1),
-  (3028, 'Arena sanitaria aglomerante 4 kg', 'Arena de bentonita que forma bolitas firmes y controla el olor.', 8900.00, 45, 'ACCESORIO', 'GATO', 'TODAS', NULL, @foto_rascador, 'image/jpeg', 1),
+  (3028, 'Arena sanitaria aglomerante Piedritas 4 kg', 'Arena de bentonita que forma bolitas firmes y controla el olor.', 8900.00, 45, 'ACCESORIO', 'GATO', 'TODAS', NULL, @foto_rascador, 'image/jpeg', 1),
   (3029, 'Transportadora para gatos y perros chicos', 'Transportadora rígida con puerta de reja, hasta 8 kg.', 42600.00, 7, 'ACCESORIO', 'TODAS', 'TODAS', NULL, @foto_cama, 'image/jpeg', 1),
   (3030, 'Chapita identificatoria grabada', 'Chapita de aluminio con el nombre y el teléfono, grabada en el momento.', 5900.00, 50, 'ACCESORIO', 'TODAS', 'TODAS', NULL, @foto_collar, 'image/jpeg', 1)
 ON DUPLICATE KEY UPDATE
   nombre = VALUES(nombre), descripcion = VALUES(descripcion), precio = VALUES(precio), stock = VALUES(stock),
   categoria = VALUES(categoria), especie_destino = VALUES(especie_destino), etapa_vida = VALUES(etapa_vida),
-  fecha_vencimiento = VALUES(fecha_vencimiento), imagen = VALUES(imagen), imagen_tipo = VALUES(imagen_tipo),
+  fecha_vencimiento = VALUES(fecha_vencimiento),
+  -- La foto se pone solo la primera vez: la que la veterinaria subió después (la del paquete real) no se pisa.
+  imagen_tipo = IF(imagen IS NULL, VALUES(imagen_tipo), imagen_tipo),
+  imagen = COALESCE(imagen, VALUES(imagen)),
   activo = VALUES(activo);
 
 
