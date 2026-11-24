@@ -97,3 +97,18 @@ ON DUPLICATE KEY UPDATE
   subtotal_insumos = VALUES(subtotal_insumos), subtotal_productos = VALUES(subtotal_productos),
   total = VALUES(total), huellitas_usadas = VALUES(huellitas_usadas), estado = VALUES(estado),
   fecha = VALUES(fecha);
+
+-- Las vacunas y desparasitaciones que la semilla 005 deja aplicadas se aplicaron en una consulta,
+-- como en el sistema (CalendarioSanitario::marcarAplicado, al finalizar la consulta de un turno de
+-- vacunación). 24/11: antes quedaban aplicadas sin consulta y el historial de la mascota salía vacío.
+--   Michi (102): la desparasitación interna (evento 103), en la consulta del turno 952.
+--   Luna (103): la 1.ª dosis de la séxtuple (evento 105), en la consulta del turno 959.
+UPDATE consulta SET diagnostico = 'Desparasitación interna: sin novedades.' WHERE id = 952;
+UPDATE consulta SET diagnostico = 'Aplicación de la 1.ª dosis de la vacuna séxtuple.' WHERE id = 959;
+
+UPDATE evento_sanitario e
+  JOIN consulta c ON c.id = CASE e.id WHEN 103 THEN 952 WHEN 105 THEN 959 END
+  SET e.fecha_programada = DATE(c.finalizada_en),
+      e.fecha_aplicada = DATE(c.finalizada_en),
+      e.consulta_id = c.id
+  WHERE e.id IN (103, 105);
