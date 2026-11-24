@@ -35,3 +35,9 @@ iniciar_sesion cliente@prueba.huellavet 'Cliente-Prueba-2026'
 pedir GET /api/pacientes/mascotas/102/historial
 esperar "Michi, que tiene turnos atendidos, tiene consultas en su historial" 200 '"consultas":[{"id":'
 cerrar_sesion
+
+# La 1.ª dosis aplicada de Luna (semilla 005) se aplicó en una consulta (semilla 009, 24/11).
+iniciar_sesion cliente2@prueba.huellavet 'Cliente-Prueba-2026'
+pedir GET /api/pacientes/mascotas/103/historial
+esperar "La vacuna aplicada de Luna está en una consulta de su historial" 200 'séxtuple'
+cerrar_sesion
