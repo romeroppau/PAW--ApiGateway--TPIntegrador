@@ -15,17 +15,23 @@ Desde la carpeta del Gateway, después del migrador:
 
 Se pueden correr todas las veces que haga falta: vuelven a dejar los datos de prueba como estaban.
 
+Para ver las pantallas con **muchos datos** (meses de turnos, 150 compras, 200 avisos...) hay un
+juego aparte, que se carga a mano después de estas: `base/semillas-volumen/README.md`.
+
 ## Cuentas de prueba
 
 Son de prueba y no existen en producción, por eso las contraseñas están acá.
 
-| Id | Rol | Email | Contraseña |
-|---|---|---|---|
-| 101 | Veterinario | `vet@prueba.huellavet` | `Vet-Prueba-2026` |
-| 102 | Cliente | `cliente@prueba.huellavet` | `Cliente-Prueba-2026` |
-| 103 | Cliente | `cliente2@prueba.huellavet` | `Cliente-Prueba-2026` |
-| 104 | Rescatista (aprobado) | `rescatista@prueba.huellavet` | `Rescatista-Prueba-2026` |
-| 105 | Rescatista (pendiente) | `rescatista2@prueba.huellavet` | `Rescatista-Prueba-2026` |
+Tienen nombres de personas, para que en una demo no se vea "Cliente de Prueba".
+
+| Id | Nombre | Rol | Email | Contraseña |
+|---|---|---|---|---|
+| 101 | Dra. Laura Martínez | Veterinario | `vet@prueba.huellavet` | `Vet-Prueba-2026` |
+| 102 | Sofía Benítez | Cliente | `cliente@prueba.huellavet` | `Cliente-Prueba-2026` |
+| 103 | Tomás Aguirre | Cliente | `cliente2@prueba.huellavet` | `Cliente-Prueba-2026` |
+| 104 | Paula Herrera (Refugio Huellitas) | Rescatista (aprobado) | `rescatista@prueba.huellavet` | `Rescatista-Prueba-2026` |
+| 105 | Nicolás Medina (Patitas al Rescate) | Rescatista (pendiente) | `rescatista2@prueba.huellavet` | `Rescatista-Prueba-2026` |
+| 120 a 124 | Lucía Fernández, Martín Gómez, Carolina Pérez, Julián Sosa y Valeria Ríos | Clientes (escribieron las reseñas de ejemplo, semilla 011) | `lucia@resenas.huellavet`, `martin@…`, `carolina@…`, `julian@…`, `valeria@…` | `Cliente-Prueba-2026` |
 
 ## Productos
 
@@ -55,6 +61,8 @@ vence en 20 días (la fecha se calcula desde hoy cada vez que se cargan las semi
 | 103 | Luna | Perro | 103 (`cliente2@`) | 10 semanas (cachorra) |
 | 104 | Tom | Gato | 103 (`cliente2@`) | 2 años |
 
+Todas tienen foto (semilla 012, fotos de Unsplash con licencia libre): Firulais, Michi, Luna, Tom, Canela, Pipa, Rocco y Simba.
+
 ## Turnos
 
 Todos con la veterinaria 101 (`vet@prueba.huellavet`). "Hoy" es la fecha de Argentina.
@@ -67,7 +75,8 @@ Todos con la veterinaria 101 (`vet@prueba.huellavet`). "Hoy" es la fecha de Arge
 | 104 | Ayer, 8:00 | 104 Tom | Consulta | Atendido | No se puede atender un turno ya atendido |
 
 Volver a cargar las semillas deja los turnos como en la tabla, aunque se hayan atendido o cancelado.
-No cargues a mano turnos de la veterinaria 101 a las 8:00 o 8:30 de esos días: chocarían con estos.
+No cargues a mano turnos de la veterinaria 101 a las 8:00 o 8:30 de esos días: chocarían con estos
+(tampoco a las 8:00 de hace 31 días: es el turno 901, el chequeo de la adopción de Simba).
 
 ## Calendario sanitario
 
@@ -96,6 +105,40 @@ Volver a cargar las semillas **borra las consultas de los turnos 101, 102 y 103*
 hicieron al probar), con sus ítems y su factura, y deja pendiente la vacuna que se haya aplicado
 en ellas. Así esos turnos se pueden atender de nuevo. Las consultas de prueba no mueven el stock:
 lo vuelven a dejar las semillas de productos e insumos.
+
+## Adopciones
+
+La rescatista 104 (`rescatista@`, aprobada) tiene tres mascotas a su cargo; la 105 (`rescatista2@`,
+pendiente) no tiene ninguna y no puede publicar. Las mascotas y el turno usan **ids desde 901**,
+porque en dev los ids 105 en adelante ya los usan las mascotas y los turnos que crea el humo.
+
+| Mascota | Dueño | Publicación | Adopción | Para qué |
+|---|---|---|---|---|
+| 901 Canela (perra, 1 año) | 104 (rescatista) | — | — | Publicar |
+| 902 Pipa (gata, 6 meses) | 104 (rescatista) | 101, aprobada | 101, con postulantes: la postulación 101 del cliente 102, pendiente | Postularse (el cliente 103), elegir, chequeo y completar |
+| 903 Rocco (perro, 2 años) | 104 (rescatista) | 102, pendiente de moderación | — | Aprobar o rechazar la publicación |
+| 904 Simba (gato, 1 año) | 103 (`cliente2@`) | 103, dada de baja | 103, finalizada **hace 30 días** (chequeo: turno 901, atendido) | El motor manda el control de los 30 días |
+
+Volver a cargar las semillas devuelve estas mascotas a su dueño y **borra lo que crearon las
+pruebas sobre ellas**: publicaciones, adopciones y postulaciones nuevas. Los chequeos que quedaron
+programados se cancelan. La foto de las publicaciones es un PNG de 1 x 1.
+
+## Compras de la tienda
+
+| Factura | Comprador | Qué | Estado | Para qué |
+|---|---|---|---|---|
+| V-000101 | 102 (`cliente@`) | 2 x alimento cachorro (101) | Pagada, lista para retirar (comprada ayer) | Constatar la entrega; los recordatorios |
+| V-000102 | 104 (`rescatista@`) | 1 x collar (110) | Entregada (hace 7 días, por la veterinaria 101) | Mostrar una compra terminada; un rescatista también compra |
+| V-000103 | 102 (`cliente@`) | 1 x antiparasitario (106) | Cancelada: venció el plazo de retiro, sin devolución | Mostrar una cancelada |
+| V-000100 | 104 (`rescatista@`) | 1 x snacks dentales (105) | Esperando el pago desde hace 40 minutos | Venció el plazo para pagar: se cancela sola (la tarea o al pasar) y el stock vuelve. Usa el id 100 porque se agregó después: los ids desde 104 ya los pueden tener compras reales de dev |
+| V-000099 | 103 (`cliente2@`) | 1 x correa extensible (113) | Pagada hace 2 días, lista para retirar | Que el comprador cancele un pedido pagado (sin devolución) y el stock vuelva. Usa el id 99 por lo mismo que la V-000100 |
+| — | 103 (`cliente2@`) | 1 x comedero (112) en el **carrito abierto** 103 | Sin confirmar | Probar el carrito y la confirmación |
+
+Las facturas 101 a 103 tienen su pago aprobado de Mercado Pago (números de operación de prueba) y
+sus movimientos de stock. El stock de los productos lo deja la semilla 002, salvo 1 snack dental
+y 1 correa extensible que quedan reservados por la V-000100 y la V-000099 hasta que se cancelan. Volver a cargar
+las semillas devuelve estas compras a su estado y cancela otro carrito abierto que las pruebas le
+hayan dejado a estos compradores.
 
 ## Reglas para agregar semillas
 

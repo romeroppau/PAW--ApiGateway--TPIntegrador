@@ -62,10 +62,17 @@ INVENTARIO_DB_USER=inventario
 INVENTARIO_DB_PASSWORD=$(clave)
 PACIENTES_DB_USER=pacientes
 PACIENTES_DB_PASSWORD=$(clave)
+ADOPCIONES_DB_USER=adopciones
+ADOPCIONES_DB_PASSWORD=$(clave)
+REPORTES_DB_USER=reportes
+REPORTES_DB_PASSWORD=$(clave)
 INTERNAL_TOKEN=$(openssl rand -hex 32)
+TAREAS_TOKEN=$(openssl rand -hex 32)
 JWT_PRIVATE_KEY="$(una_linea "$DIR/jwt_privada.pem")"
 JWT_PUBLIC_KEY="$(una_linea "$DIR/jwt_publica.pem")"
 EOF
+
+export TAREAS_TOKEN=$(grep '^TAREAS_TOKEN=' "$DIR/ci.env" | cut -d= -f2)
 
 # --- 3. Ajustes de Compose para la prueba ----------------------------------------------------
 # MySQL con SSL, y el certificado de .ci/ en lugar del ca.pem de cada uno.
@@ -147,6 +154,8 @@ esperar_salud gateway
 [ -f Backend/src/Index.php ]      && esperar_salud backend
 [ -f Inventario/src/index.php ]   && esperar_salud inventario
 [ -f Pacientes/src/index.php ]    && esperar_salud pacientes
+[ -f Adopciones/src/index.php ]   && esperar_salud adopciones
+[ -f Reportes/src/index.php ]     && esperar_salud reportes
 
 # --- 6. Pruebas de humo (si ya existen) -------------------------------------------------------
 if [ -f pruebas/humo.sh ]; then

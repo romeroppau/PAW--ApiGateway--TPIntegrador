@@ -1,0 +1,28 @@
+name: Enviar avisos
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+jobs:
+  enviar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Llamar a la tarea de envío
+        env:
+          URL_BASE: ${{ vars.URL_BASE }}
+          TAREAS_TOKEN: ${{ secrets.TAREAS_TOKEN }}
+        run: |
+          RESUMEN=$(curl --fail-with-body -sS -X POST \
+            -H "X-Tarea-Token: $TAREAS_TOKEN" \
+            "$URL_BASE/api/notificaciones/tareas/enviar")
+          echo "$RESUMEN"
+          # Token de WhatsApp vencido, variable faltante o plantilla mal: la tarea corre (200) pero no
+          # sale ningún mensaje. Se marca en el resumen de Actions para que se vea.
+          if printf '%s' "$RESUMEN" | grep -q '"error_configuracion"'; then
+            echo "::warning::WhatsApp no envió avisos por un problema de configuración: $RESUMEN"
+          fi
+          if printf '%s' "$RESUMEN" | grep -q '"descartadas":[1-9]'; then
+            echo "::notice::Hay avisos que no van a salir por WhatsApp (ver notificacion.ultimo_error)"
+          fi
