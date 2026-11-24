@@ -1,28 +1,81 @@
+# Tareas cada 15 minutos, en dev y en producción:
+#
+# 1. POST /api/notificaciones/tareas/enviar (Backend): manda por WhatsApp los avisos pendientes.
+# 2. POST /api/tienda/tareas/vencer (Inventario): cancela las compras vencidas, manda los recordatorios
+#    de retiro y los avisos de cancelación, y reintenta los reintegros de Mercado Pago que fallaron.
+#
+# Las dos usan el header X-Tarea-Token: en producción el secret TAREAS_TOKEN y en dev TAREAS_TOKEN_DEV
+# (si no existe, TAREAS_TOKEN). También se puede correr a mano desde Actions ("Run workflow").
+
 name: Enviar avisos
 
 on:
   schedule:
     - cron: "*/15 * * * *"
   workflow_dispatch:
+    inputs:
+      entorno:
+        description: "Entorno donde correr las tareas"
+        required: true
+        default: "ambos"
+        type: choice
+        options:
+          - dev
+          - prod
+          - ambos
+
+# Si una corrida se atrasa, la siguiente espera en vez de pisarse con ella.
+concurrency:
+  group: enviar-avisos
+  cancel-in-progress: false
 
 jobs:
-  enviar:
+  tareas:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      # Si falla un entorno, el otro corre igual.
+      fail-fast: false
+      matrix:
+        include:
+          - entorno: dev
+            url: https://paw-apigateway-tpintegrador-dev.onrender.com
+          - entorno: prod
+            url: https://paw-apigateway-tpintegrador.onrender.com
+
+    env:
+      URL: ${{ matrix.url }}
+      TOKEN: ${{ matrix.entorno == 'dev' && (secrets.TAREAS_TOKEN_DEV || secrets.TAREAS_TOKEN) || secrets.TAREAS_TOKEN }}
+      CORRE: ${{ github.event_name == 'schedule' || inputs.entorno == 'ambos' || inputs.entorno == matrix.entorno }}
+
     steps:
-      - name: Llamar a la tarea de envío
-        env:
-          URL_BASE: ${{ vars.URL_BASE }}
-          TAREAS_TOKEN: ${{ secrets.TAREAS_TOKEN }}
+      - name: Enviar los WhatsApp pendientes (${{ matrix.entorno }})
+        if: env.CORRE == 'true'
         run: |
-          RESUMEN=$(curl --fail-with-body -sS -X POST \
-            -H "X-Tarea-Token: $TAREAS_TOKEN" \
-            "$URL_BASE/api/notificaciones/tareas/enviar")
+          if [ -z "$TOKEN" ]; then
+            echo "::warning::Falta el secret TAREAS_TOKEN (o TAREAS_TOKEN_DEV) para ${{ matrix.entorno }}."
+            exit 0
+          fi
+          RESUMEN=$(curl --fail-with-body -sS --max-time 90 -X POST \
+            -H "X-Tarea-Token: $TOKEN" \
+            "$URL/api/notificaciones/tareas/enviar")
           echo "$RESUMEN"
           # Token de WhatsApp vencido, variable faltante o plantilla mal: la tarea corre (200) pero no
           # sale ningún mensaje. Se marca en el resumen de Actions para que se vea.
           if printf '%s' "$RESUMEN" | grep -q '"error_configuracion"'; then
-            echo "::warning::WhatsApp no envió avisos por un problema de configuración: $RESUMEN"
+            echo "::warning::${{ matrix.entorno }}: WhatsApp no envió avisos por un problema de configuración: $RESUMEN"
           fi
           if printf '%s' "$RESUMEN" | grep -q '"descartadas":[1-9]'; then
-            echo "::notice::Hay avisos que no van a salir por WhatsApp (ver notificacion.ultimo_error)"
+            echo "::notice::${{ matrix.entorno }}: hay avisos que no van a salir por WhatsApp (ver notificacion.ultimo_error)"
           fi
+
+      - name: Vencimientos y recordatorios de la tienda (${{ matrix.entorno }})
+        if: env.CORRE == 'true' && !cancelled()
+        run: |
+          if [ -z "$TOKEN" ]; then
+            exit 0
+          fi
+          curl --fail-with-body -sS --max-time 90 -X POST \
+            -H "X-Tarea-Token: $TOKEN" \
+            "$URL/api/tienda/tareas/vencer"
+          echo

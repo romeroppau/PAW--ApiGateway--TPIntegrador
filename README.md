@@ -1,340 +1,276 @@
-# PAW--ApiGateway--TPIntegrador
 # HuellaVet — API Gateway
 
-API Gateway es el punto de entrada HTTP de HuellaVet. Recibe las solicitudes del Frontend y, mediante Nginx, las deriva al módulo responsable. El Gateway centraliza la infraestructura común, pero no reemplaza la lógica de negocio de Backend ni de Inventario.
+Repositorio **ApiGateway** del Trabajo Práctico Integrador de **Programación en Ambiente Web (PAW)** — UNLu, 2026 — Grupo **La 25**.
 
-## Objetivo y alcance de este repositorio
+Es la **única entrada pública** de la API de HuellaVet. Recibe los pedidos del Frontend y, con Nginx, los deriva al módulo que corresponde según el prefijo de la ruta. Además reúne lo que comparten todos los módulos: el código PHP común, Docker, las migraciones, los datos de prueba, las pruebas de integración y las tareas programadas.
 
-Este repositorio reúne la configuración que permite ejecutar e integrar los módulos PHP:
+| Entorno | URL |
+| --- | --- |
+| Producción | https://paw-apigateway-tpintegrador.onrender.com |
+| Desarrollo | https://paw-apigateway-tpintegrador-dev.onrender.com |
 
-- **Nginx:** recibe las solicitudes y las deriva según el prefijo de la ruta.
-- **PHP común (`comun/`):** ofrece herramientas compartidas para leer pedidos, responder JSON, leer variables de entorno, conectarse a MySQL, validar datos y registrar errores.
-- **Backend:** gestiona el registro y el inicio/cierre de sesión, los datos del usuario actual y la creación inicial de la cuenta de veterinario.
-- **Inventario:** es responsable del ABM de productos, el stock y los endpoints del catálogo. Su disponibilidad depende de que el módulo y su proceso estén integrados y levantados.
-- **Pacientes:** mascotas, turnos, consultas, facturas de consulta y calendario sanitario (Entrega 4). Corre en su propio proceso, con su propio usuario de MySQL.
-- **Adopciones:** publicaciones de los rescatistas, moderación, postulaciones y cierre de la adopción (Entrega 5). Corre en su propio proceso (9004), con su propio usuario de MySQL.
-- **Base de datos:** las migraciones de `base/` crean la estructura y asignan permisos a las cuentas de los módulos.
+## Autores
 
-El Gateway define las reglas de enrutamiento; cada módulo implementa sus propias operaciones y controles de autorización.
+| Integrante | Legajo |
+| --- | --- |
+| Ana Paula Romero | 195388 |
+| Maria Trinidad Lopez | 197958 |
+| Valentino Aimale | 197961 |
+| Cristian Tomás Anito | 158887 |
 
-En el Frontend, `js/api.js` centraliza el uso de `fetch`. `vercel.json` reescribe las solicitudes `/api/...` al servicio público de Render para que el navegador use el mismo origen del sitio.
+## Documentación
 
-## Estructura principal
+- [Contrato del ApiGateway](./api/CONTRATO_API_ApiGateway.md): prefijos, reglas comunes (sesión, CSRF, errores) y qué módulo atiende cada ruta.
+- Contratos de cada módulo: carpeta `docs/api/` de cada submódulo.
+- DER y diagrama de clases: en el repo [Backend](https://github.com/romeroppau/PAW--Backend--TPIntegrador/tree/dev/docs).
+- Cuentas de prueba: [`base/semillas/README.md`](./base/semillas/README.md).
+
+---
+
+## Arquitectura
+
+```
+Navegador ──> Vercel (Frontend) ──/api/…──> Render: un contenedor Docker
+                                              │
+                                              ├─ Nginx (puerto público)
+                                              │    ├─ /api/gateway/       → Gateway     127.0.0.1:9000
+                                              │    ├─ /api/auth, /cuenta, /clientes, /rescatistas,
+                                              │    │  /configuracion, /notificaciones, /resenas,
+                                              │    │  /backend/salud      → Backend     127.0.0.1:9001
+                                              │    ├─ /api/tienda/, /api/inventario/ → Inventario 127.0.0.1:9002
+                                              │    ├─ /api/pacientes/     → Pacientes   127.0.0.1:9003
+                                              │    ├─ /api/adopciones     → Adopciones  127.0.0.1:9004
+                                              │    ├─ /api/reportes/      → Reportes    127.0.0.1:9005
+                                              │    └─ /internal/          → 404 (bloqueado desde afuera)
+                                              │
+                                              └─ MySQL en Aiven (un usuario por módulo)
+```
+
+- Cada módulo es un **repositorio aparte**, incluido acá como **submódulo de Git**, y corre en su **propio proceso PHP**, con su propio usuario de MySQL.
+- Los módulos se hablan entre sí por `127.0.0.1` y rutas `/internal/` con el header `X-Servicio-Token` (`INTERNAL_TOKEN`). Nginx no publica esas rutas.
+- `docker/iniciar.sh` le pasa a cada proceso **solo las variables que necesita**: la clave privada del JWT solo la recibe Backend, el token de WhatsApp solo Backend y los de Mercado Pago solo Inventario.
+- Si a Pacientes, Adopciones o Reportes les faltan sus credenciales de base, ese módulo no se inicia (queda un `[AVISO]` en el log) y el resto sigue funcionando.
+
+| Módulo | Qué tiene |
+| --- | --- |
+| [Backend](https://github.com/romeroppau/PAW--Backend--TPIntegrador) | Usuarios, sesión, cuenta, configuración, notificaciones, WhatsApp y reseñas |
+| [Inventario](https://github.com/romeroppau/PAW--Inventario--TPIntegrador) | Productos, insumos, stock y la tienda (carrito, compras, pagos, promociones) |
+| [Pacientes](https://github.com/romeroppau/PAW--Pacientes--TPIntegrador) | Mascotas, turnos, consultas, facturas, calendario sanitario y turnos con descuento |
+| [Adopciones](https://github.com/romeroppau/PAW--Adopciones--TPIntegrador) | Publicaciones, moderación, postulaciones y cierre de la adopción |
+| [Reportes](https://github.com/romeroppau/PAW--Reportes--TPIntegrador) | Reportes, sugerencias y el motor diario de avisos |
+
+### Estructura
 
 ```text
 .
-├── Backend/                     # Submódulo Git con el código de Backend
-├── Inventario/                  # Submódulo Git con el código de Inventario
-├── Pacientes/                   # Submódulo Git con el código de Pacientes
-├── Adopciones/                  # Submódulo Git con el código de Adopciones
+├── Backend/ Inventario/ Pacientes/ Adopciones/ Reportes/   Submódulos
 ├── api/CONTRATO_API_ApiGateway.md
 ├── base/
-│   ├── migrar.php               # Ejecuta migraciones SQL y asigna permisos
-│   ├── 001_backend_usuario.sql  # Crea la tabla usuario
-│   ├── 002_inventario_producto.sql
-│   └── permisos/                # Permisos por migración: un archivo NNN_*.sql por cada base/NNN_*.sql
-├── comun/
-│   ├── index.php                # Entrada del proceso PHP del Gateway
-│   ├── router.php               # Ruteo de endpoints propios del Gateway
-│   ├── request.php              # Lectura de la petición HTTP
-│   ├── response.php             # Respuestas JSON y códigos HTTP
-│   ├── config.php               # Lectura de configuración
-│   ├── database.php             # Conexión PDO a MySQL
-│   ├── validator.php            # Validaciones reutilizables
-│   ├── logger.php               # Registro de eventos y errores
-│   └── auth.php                 # Validación de sesión, rol y CSRF compartida
+│   ├── migrar.php            Aplica las migraciones pendientes y los permisos
+│   ├── NNN_*.sql             Migraciones (001 a 020)
+│   ├── permisos/             Permisos de MySQL, un archivo por migración
+│   ├── sembrar.php           Carga los datos de prueba (nunca en producción)
+│   ├── semillas/             Datos de prueba comunes (los usa la prueba de humo)
+│   └── semillas-volumen/     Datos en cantidad, para ver cómo escalan las pantallas
+├── comun/                    PHP compartido: router, request, response, config, database,
+│                             validator, logger, auth (sesión, rol y CSRF) y configuracion
 ├── docker/
-│   ├── iniciar.sh               # Inicia los procesos PHP y Nginx
-│   └── nginx.conf               # Rutas y configuración de Nginx
-├── Dockerfile                   # Imagen del servicio
-├── compose.yaml                 # Servicios para desarrollo local
-├── .env.example                 # Plantilla de variables, sin secretos
-└── .gitmodules                  # Definición de submódulos
+│   ├── iniciar.sh            Inicia los procesos PHP y Nginx
+│   └── nginx.conf            Las rutas
+├── pruebas/
+│   ├── integracion.sh        Levanta todo en Docker, migra, siembra y corre la prueba de humo
+│   ├── humo.sh               Herramientas de la prueba de humo
+│   └── casos/                Un archivo de casos por tema (01 a 18)
+├── .github/workflows/        Pruebas, Motor diario, Enviar avisos y Keepalive
+├── Dockerfile · compose.yaml · .env.example
+└── autores.txt · VERSION.txt
 ```
 
-Los nombres y la disponibilidad de los endpoints de cada módulo deben coincidir con el contrato de API y con la implementación que esté desplegada.
+---
 
-## Requisitos
+## Cómo correrlo
 
-- Git.
-- Docker Desktop instalado y en ejecución.
-- Acceso al repositorio GitHub y a los repositorios usados como submódulos.
-- Para la configuración remota: acceso a Aiven, Render y a las credenciales/certificado de la base.
+### Qué hace falta
 
-En Windows, iniciar Docker Desktop antes de ejecutar comandos `docker compose`.
+- Git y [Docker Desktop](https://www.docker.com/products/docker-desktop/) (en Windows, iniciarlo antes de correr `docker compose`).
+- Para conectarse a la base remota: acceso a Aiven, Render y al certificado `ca.pem` de la base.
 
-## Obtener el proyecto
-
-Clonar el repositorio incluyendo los submódulos:
+### 1. Clonar con los submódulos
 
 ```bash
-git clone --recurse-submodules <URL_DEL_REPOSITORIO_APIGATEWAY>
+git clone --recurse-submodules https://github.com/romeroppau/PAW--ApiGateway--TPIntegrador.git
 cd PAW--ApiGateway--TPIntegrador
 ```
 
-Si ya lo clonaste sin submódulos, desde la raíz del repositorio ejecutá:
+Si ya estaba clonado sin submódulos: `git submodule update --init --recursive`.
+
+### 2. Variables de entorno
 
 ```bash
-git submodule update --init --recursive
+cp .env.example .env
 ```
 
-Backend e Inventario son repositorios independientes incorporados como submódulos. El repositorio principal guarda la referencia al commit de cada submódulo.
+El `.env` tiene contraseñas y claves: **nunca se sube** al repositorio. Las claves del JWT se generan como dice el README de [Backend](https://github.com/romeroppau/PAW--Backend--TPIntegrador#cómo-correrlo); los tokens, con `openssl rand -hex 32`, y las contraseñas de los módulos, con `openssl rand -hex 16`.
 
-## Configurar las variables de entorno
+| Variable | Para qué |
+| --- | --- |
+| `ENTORNO` | `local`, `ci` o `dev`; en producción, otro valor (por ejemplo `prod`). En `local` y `ci` el WhatsApp y Mercado Pago se simulan; las semillas solo se cargan en `local`, `dev` y `ci` |
+| `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_SSL_CA` | La base. `DB_SSL_CA` es la ruta del certificado **dentro del contenedor** (`/app/ca.pem` en local, la del Secret File en Render) |
+| `DB_ADMIN_USER`, `DB_ADMIN_PASSWORD` | Solo para el migrador y el sembrador; la API nunca la usa |
+| `MYSQL_ROOT_PASSWORD` | El MySQL local opcional (perfil `local`) |
+| `BACKEND_DB_*`, `INVENTARIO_DB_*`, `PACIENTES_DB_*`, `ADOPCIONES_DB_*`, `REPORTES_DB_*` | Usuario y contraseña de MySQL de cada módulo |
+| `JWT_PRIVATE_KEY` | Firma la sesión. Solo la recibe Backend |
+| `JWT_PUBLIC_KEY` | Verifica la sesión en todos los módulos |
+| `INTERNAL_TOKEN` | Llamadas internas entre módulos (`/internal/`) |
+| `TAREAS_TOKEN` | Tareas programadas (header `X-Tarea-Token`) |
+| `WHATSAPP_TOKEN`, `WHATSAPP_NUMERO_ID`, `WHATSAPP_PLANTILLA`, `WHATSAPP_IDIOMA`, `WHATSAPP_API_VERSION` | Envío real de WhatsApp. Solo Backend |
+| `MP_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET` | Mercado Pago (siempre credenciales de prueba). Solo Inventario |
+| `SITIO_URL` | Dirección pública del frontend, sin `/` al final (vuelta desde Mercado Pago) |
 
-1. Copiar `.env.example` a `.env` en la raíz del repositorio.
-2. Completar los valores para el entorno que se quiera utilizar.
-3. No subir `.env`, contraseñas, claves JWT ni certificados privados al repositorio.
+En Render, las variables y el `ca.pem` (como Secret File) se cargan en el panel de cada servicio; no se copian solas desde el `.env`. Dev y producción tienen **valores distintos** para las contraseñas, el JWT y los tokens.
 
-Variables principales:
-
-| Variable | Uso |
-|---|---|
-| `DB_HOST` | Host de MySQL. En la configuración remota, es el hostname de Aiven; no usar `db` para conectarse a Aiven. |
-| `DB_PORT` | Puerto de MySQL informado por el proveedor. |
-| `DB_NAME` | Base de datos que utiliza la aplicación (por ejemplo, `huellavet`). |
-| `DB_SSL_CA` | Ruta **dentro del contenedor** al archivo CA que verifica el servidor MySQL. |
-| `BACKEND_DB_USER` / `BACKEND_DB_PASSWORD` | Credenciales de la cuenta limitada usada por Backend. |
-| `INVENTARIO_DB_USER` / `INVENTARIO_DB_PASSWORD` | Credenciales de la cuenta de Inventario. |
-| `PACIENTES_DB_USER` / `PACIENTES_DB_PASSWORD` | Credenciales de la cuenta de Pacientes. Si faltan en Render, Pacientes no se inicia (el resto sigue funcionando y queda un aviso en el log). |
-| `ADOPCIONES_DB_USER` / `ADOPCIONES_DB_PASSWORD` | Credenciales de la cuenta de Adopciones (`adopciones`). El migrador necesita la contraseña para crear la cuenta (migración 007). Si faltan en Render, Adopciones no se inicia (el resto sigue funcionando y queda un aviso en el log). |
-| `INTERNAL_TOKEN` | Token de las llamadas internas entre módulos (`/internal/`, por ejemplo Pacientes → Inventario para descontar stock y Adopciones → Pacientes para transferir la mascota). Lo reciben Inventario, Pacientes y Adopciones. Generarlo con `openssl rand -hex 32`. |
-| `DB_ADMIN_USER` / `DB_ADMIN_PASSWORD` | Cuenta con permisos suficientes para ejecutar las migraciones; no se usa para las peticiones habituales de la API. |
-| `JWT_PRIVATE_KEY` | Clave privada que usa Backend para firmar los JWT. No debe compartirse con Gateway ni Inventario. |
-| `JWT_PUBLIC_KEY` | Clave pública para verificar firmas JWT en los módulos que la necesiten. |
-| `MYSQL_ROOT_PASSWORD`, `LOCAL_DB_NAME`, `MYSQL_HOST_PORT` | Parámetros del MySQL local opcional definido en Compose. |
-
-Ejemplo de variables (no copiar contraseñas reales ni pegar secretos en el README):
-
-```dotenv
-PORT=10000
-APP_PORT=10000
-DB_HOST=<HOST_DE_AIVEN>
-DB_PORT=<PUERTO_DE_AIVEN>
-DB_NAME=huellavet
-DB_SSL_CA=/app/ca.pem
-BACKEND_DB_USER=backend
-BACKEND_DB_PASSWORD=<CONTRASENA_BACKEND>
-INVENTARIO_DB_USER=inventario
-INVENTARIO_DB_PASSWORD=<CONTRASENA_INVENTARIO>
-PACIENTES_DB_USER=pacientes
-PACIENTES_DB_PASSWORD=<CONTRASENA_PACIENTES>
-ADOPCIONES_DB_USER=adopciones
-ADOPCIONES_DB_PASSWORD=<CONTRASENA_ADOPCIONES>
-INTERNAL_TOKEN=<TOKEN_INTERNO>
-DB_ADMIN_USER=avnadmin
-DB_ADMIN_PASSWORD=<CONTRASENA_ADMIN_AIVEN>
-JWT_PRIVATE_KEY=<CLAVE_PRIVADA_JWT>
-JWT_PUBLIC_KEY=<CLAVE_PUBLICA_JWT>
-```
-
-### Certificado CA
-
-Para desarrollo local, si `ca.pem` está en la raíz del repositorio y `compose.yaml` lo monta en `/app/ca.pem`, configurá `DB_SSL_CA=/app/ca.pem`. El archivo debe existir y ser legible dentro del contenedor. Mantenelo fuera de Git si el equipo decidió administrarlo localmente; agregalo a `.gitignore`.
-
-En Render, el sistema de archivos del contenedor es distinto al de tu computadora. Si el certificado se entrega como Secret File, configurá `DB_SSL_CA` con la ruta que Render le asigna (por ejemplo `/etc/secrets/ca.pem`). No reutilices una ruta local que solo existe en Windows o en Docker Compose.
-
-## Ejecutar localmente
-
-Desde la raíz del repositorio, con Docker Desktop iniciado:
-
-1. Comprobar que Compose puede interpretar la configuración:
-
-   ```bash
-   docker compose config --quiet
-   ```
-
-2. Construir la imagen y levantar el servicio:
-
-   ```bash
-   docker compose up --build --force-recreate -d
-   ```
-
-3. Ver el estado de los servicios:
-
-   ```bash
-   docker compose ps
-   ```
-
-4. Ver los registros de la aplicación:
-
-   ```bash
-   docker compose logs --tail=100 app
-   ```
-
-5. Probar la salud del Gateway:
-
-   ```bash
-   curl -i http://localhost:10000/api/gateway/salud
-   ```
-
-6. Probar la salud del Backend:
-
-   ```bash
-   curl -i http://localhost:10000/api/backend/salud
-   ```
-
-La respuesta esperada para cada endpoint es HTTP `200 OK` y un JSON que indique que el módulo funciona. El endpoint de salud del Backend intenta además ejecutar `SELECT 1`, por lo que permite comprobar la conectividad de la base configurada.
-
-Para detener los servicios:
+### 3. Levantar
 
 ```bash
-docker compose down
+docker compose up -d --build
+docker compose ps
+docker compose logs --tail=100 app
 ```
 
-Este comando detiene y elimina los contenedores de este proyecto, pero no elimina el volumen de datos nombrado. No agregues `-v` salvo que realmente quieras eliminar los volúmenes asociados.
+Para usar un MySQL local en vez de Aiven: `docker compose --profile local up -d db` (y en el `.env`, `DB_HOST=db`).
 
-### MySQL local opcional
+### 4. Migraciones
 
-`compose.yaml` puede incluir el servicio `db` bajo el perfil `local`. Se inicia con:
+Se corren **a mano** cuando hay cambios de esquema:
 
 ```bash
-docker compose --profile local up -d db
+docker compose --profile tools run --rm --build migrator
 ```
 
-El host `db` solo tiene sentido desde otros contenedores de la misma red de Compose. Para conectar la API con Aiven, utilizá el host y puerto de Aiven en las variables de entorno.
+Para otro entorno, con otro archivo de variables: `docker compose --env-file .env.dev --profile tools run --rm --build migrator`.
 
-## Migraciones de la base de datos
+`base/migrar.php` registra en la tabla `migracion` qué archivos ya se aplicaron, aplica los pendientes en orden, crea o actualiza los usuarios de cada módulo con las contraseñas del `.env` y aplica los permisos de `base/permisos/`.
 
-Las migraciones se ejecutan manualmente cuando hay cambios de esquema; no se ejecutan en cada petición de la API. El script `base/migrar.php`:
+> **Precaución:** revisá `DB_HOST` y `DB_NAME` antes de correrlo. El migrador **vuelve a asignar las contraseñas de los módulos**, así que tienen que ser las mismas que están en Render; si no, ese entorno deja de conectarse a la base.
 
-- Se conecta usando `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_ADMIN_USER`, `DB_ADMIN_PASSWORD` y `DB_SSL_CA`.
-- Crea/consulta la tabla `migracion` para registrar qué archivos `base/NNN_*.sql` ya se aplicaron.
-- Ejecuta las migraciones pendientes en orden.
-- Crea/actualiza las cuentas `backend`, `inventario`, `pacientes` y `adopciones` con las contraseñas indicadas (`BACKEND_DB_PASSWORD`, `INVENTARIO_DB_PASSWORD`, `PACIENTES_DB_PASSWORD` y `ADOPCIONES_DB_PASSWORD`). **Tienen que ser las mismas que están en Render:** el migrador se las vuelve a asignar cada vez.
-- Aplica los permisos de `base/permisos/`: un archivo por migración, con el mismo nombre (por ejemplo `base/permisos/003_inventario_insumo.sql` acompaña a `base/003_inventario_insumo.sql`). Cada rama agrega su propio archivo, así nadie edita un archivo de permisos compartido. Los permisos siguen la tabla "Permisos de MySQL por módulo" del DER.
-
-Para ejecutar el migrador con el perfil `tools`:
+### 5. Datos de prueba (solo local y dev)
 
 ```bash
-docker compose --profile tools run --rm migrator
+docker compose --profile tools run --rm sembrador            # datos comunes
+docker compose --profile tools run --rm sembrador-volumen    # datos en cantidad (opcional)
 ```
 
-**Precaución:** verificá cuidadosamente `DB_HOST`, `DB_NAME` y `DB_ADMIN_USER` antes de ejecutarlo, porque el comando modifica la estructura y los permisos de la base a la que apunten las variables. En la configuración remota, la migración se aplica a Aiven; no asumas que se está usando MySQL local.
+El sembrador se niega a correr con `ENTORNO=prod`: en producción las cuentas se crean por la web y el veterinario con el script de Backend. Las cuentas de prueba están en `base/semillas/README.md`.
 
-Actualmente, `001_backend_usuario.sql` crea la tabla `usuario` y `002_inventario_producto.sql` las tablas `producto` y `movimiento_inventario`.
-
-## Crear la cuenta inicial de veterinario
-
-El veterinario se crea mediante `Backend/scripts/crear_veterinario.php`, no a través del formulario público de registro. Con el servicio `app` levantado, desde la raíz del repositorio se puede ejecutar el script pasando las variables que espera:
+### 6. Crear al veterinario (si no se cargaron las semillas)
 
 ```bash
-docker compose exec app sh -c 'DB_USER="$BACKEND_DB_USER" DB_PASSWORD="$BACKEND_DB_PASSWORD" VET_NOMBRE="Nombre de prueba" VET_EMAIL="vet@example.com" VET_PASSWORD="REEMPLAZAR_POR_UNA_CLAVE_SEGURA" php /app/Backend/scripts/crear_veterinario.php'
+docker compose exec app sh -c 'DB_USER="$BACKEND_DB_USER" DB_PASSWORD="$BACKEND_DB_PASSWORD" VET_NOMBRE="Nombre" VET_EMAIL="vet@huellavet.com" VET_PASSWORD="una-contraseña-segura" php /app/Backend/scripts/crear_veterinario.php'
 ```
 
-Reemplazá los datos de ejemplo. Evitá usar una contraseña real en comandos que vayan a quedar guardados en el historial compartido de la terminal.
+### 7. Comprobar
 
-## Rutas principales
+```bash
+curl http://localhost:10000/api/gateway/salud
+curl http://localhost:10000/api/backend/salud
+curl http://localhost:10000/api/inventario/salud
+curl http://localhost:10000/api/pacientes/salud
+curl http://localhost:10000/api/adopciones/salud
+curl http://localhost:10000/api/reportes/salud
+```
 
-| Método | Ruta | Propósito |
-|---|---|---|
-| `GET` | `/api/gateway/salud` | Comprueba el Gateway. |
-| `GET` | `/api/backend/salud` | Comprueba el Backend y su conexión a la base. |
-| `GET` | `/api/inventario/salud` | Comprueba Inventario y su conexión a la base. |
-| `GET` | `/api/pacientes/salud` | Comprueba Pacientes y su conexión a la base. |
-| `GET` | `/api/adopciones/salud` | Comprueba Adopciones y su conexión a la base. |
-| `POST` | `/api/auth/registro/cliente` | Registra un cliente. |
-| `POST` | `/api/auth/registro/rescatista` | Registra un rescatista. |
-| `POST` | `/api/auth/login` | Inicia sesión. |
-| `POST` | `/api/auth/logout` | Cierra sesión (requiere sesión y verificación CSRF según el contrato). |
-| `GET` | `/api/auth/yo` | Devuelve los datos de la sesión actual. |
-| `GET` | `/api/tienda/productos` | Lista productos públicos con búsqueda, filtros y paginado; depende de Inventario. |
-| `GET` | `/api/tienda/productos/{id}` | Consulta el detalle de un producto activo; depende de Inventario. |
-| `GET/POST/PUT/DELETE` | `/api/inventario/productos...` | Operaciones de administración de productos definidas en el contrato de API. |
+Cada uno tiene que responder `200` con `{"estado":"funciona","modulo":"…"}`. Los de los módulos además prueban la conexión a la base.
 
-Las rutas de tienda e Inventario están documentadas en `api/CONTRATO_API_ApiGateway.md`; la implementación debe estar disponible en el módulo Inventario para que respondan correctamente.
+Para apagar: `docker compose down` (sin `-v`, salvo que se quiera borrar el volumen de la base local).
+
+---
+
+## Pruebas
+
+| Prueba | Qué hace | Cómo se corre |
+| --- | --- | --- |
+| **Integración** | Levanta todo en Docker con un MySQL propio, migra, siembra y corre la prueba de humo. No toca el entorno local (usa otro proyecto de Docker y otros puertos) | `bash pruebas/integracion.sh` (con `MANTENER=1` queda levantado) |
+| **Humo** | Pedidos con `curl` a la API y el resultado esperado de cada uno, por tema: general, roles, insumos, stock interno, mascotas y turnos, calendario, consultas, adopciones, notificaciones, configuración, reportes, tienda, promociones, motor, mis datos, reseñas, verificación del WhatsApp y promoción de turnos | `bash pruebas/humo.sh http://localhost:10000`; contra producción, solo lectura: `SOLO_LECTURA=1 bash pruebas/humo.sh https://paw-apigateway-tpintegrador.onrender.com` |
+| **PHPUnit** | Las de cada módulo | En la carpeta de cada submódulo (ver su README) |
+
+GitHub Actions (`pruebas.yml`) corre en cada push y pull request: comprueba que a `main` solo se mergee desde `dev`, la sintaxis de PHP y de los scripts, que cada PHP empiece con `<?php` y la prueba de integración completa.
+
+---
+
+## Tareas programadas (GitHub Actions)
+
+| Workflow | Cuándo | Qué hace |
+| --- | --- | --- |
+| **Motor diario** | Todos los días a las 09:00 de Argentina, en dev y producción (y a mano, eligiendo el entorno) | `POST /api/reportes/tareas/diaria` (avisos de vacunas, controles de adopción, stock bajo y qué liquidar) y después `POST /api/notificaciones/tareas/enviar` |
+| **Enviar avisos** | Cada 15 minutos, contra el entorno de la variable `URL_BASE` del repo | `POST /api/notificaciones/tareas/enviar`: manda por WhatsApp los avisos pendientes |
+| **Keepalive** | Cada 14 minutos | Consulta la salud de producción para que Render no apague el servicio |
+| **Pruebas** | En cada push y pull request | Ver [Pruebas](#pruebas) |
+
+Las tareas usan el header `X-Tarea-Token` con los secrets `TAREAS_TOKEN` (producción) y `TAREAS_TOKEN_DEV` (dev). GitHub solo corre los horarios programados desde la rama `main`.
+
+---
 
 ## Actualizar los submódulos
 
-Cuando un compañero publique cambios en el repositorio remoto de Backend o Inventario, hay que actualizar el submódulo correspondiente y luego reconstruir la imagen para probar localmente. Por ejemplo, desde la raíz:
+Cuando un compañero mergea cambios en un módulo, desde la raíz:
 
 ```bash
-git submodule update --init --remote Backend
+git checkout dev && git pull
+git submodule update --init
+cd Backend                                        # o Inventario, Pacientes, Adopciones, Reportes
+git fetch origin && git checkout origin/dev
+cd ..
 ```
 
-Para Inventario:
+Ojo: `git submodule update --remote` trae la rama **`main`** del submódulo (`.gitmodules` no fija otra), no `dev`. En la rama `dev` de ApiGateway, los submódulos tienen que apuntar a `dev` de cada módulo.
+
+Después se guarda la nueva referencia en una rama y se abre un pull request a `dev`:
 
 ```bash
-git submodule update --init --remote Inventario
+git add Backend
+git commit -m "Actualiza Backend"
+git push -u origin <rama>
 ```
 
-Para Pacientes:
+Agregá solo los submódulos que realmente cambiaron, y no uses `--remote` si tenés cambios sin guardar dentro del submódulo (revisá antes `git status`).
 
-```bash
-git submodule update --init --remote Pacientes
-```
+---
 
-Para Adopciones:
+## Despliegue
 
-```bash
-git submodule update --init --remote Adopciones
-```
+- **API:** Render construye la imagen con el `Dockerfile`. El servicio de dev sigue la rama `dev` y el de producción la rama `main`.
+- **Base:** MySQL en Aiven; dev y producción son instancias separadas, cada una con su `ca.pem`.
+- **Frontend:** Vercel, desde su propio repo; reescribe `/api/…` al servicio de Render que corresponde.
 
-Si el repositorio principal debe guardar la nueva versión utilizada, registrar la referencia del submódulo y subirla:
+### Pasar de dev a producción
 
-```bash
-git add Backend Inventario
-git commit -m "Actualiza referencias de submódulos"
-git push
-```
+1. Pull request de `dev` a `main` en cada repo (primero los módulos, después ApiGateway con las referencias de los submódulos, al final Frontend).
+2. Revisar que estén en Render de producción todas las variables nuevas.
+3. Correr el migrador contra producción con el `.env` de producción.
+4. Comprobar la salud de todos los módulos y correr la prueba de humo en modo solo lectura.
 
-Hacé `git add` solo para el submódulo cuyo commit haya cambiado y que corresponda incluir. No uses `--remote` si tenés modificaciones locales sin guardar en el submódulo: revisá primero `git status`.
+---
 
-## Despliegue y HTTPS
+## Seguridad
 
-- **Frontend:** se publica desde su propio repositorio en Vercel. `vercel.json` reescribe `/api/:path*` al servicio de Render conservando la ruta, por ejemplo `/api/backend/salud`.
-- **API Gateway / módulos PHP:** se construyen con el `Dockerfile` y se ejecutan en Render. Tras `git push`, verificá que el despliegue termine correctamente.
-- **Base de datos:** MySQL se aloja en Aiven y la conexión remota debe utilizar el host, el puerto y el certificado CA de la misma instancia.
+- Nginx es la única entrada pública; `/internal/` y cualquier ruta desconocida responden 404.
+- Sesión con JWT RS256 en cookie `HttpOnly`, `Secure` y `SameSite=Strict`; `comun/auth.php` verifica la sesión, el rol y el token CSRF en todo `POST`, `PUT` y `DELETE`.
+- Cada módulo usa su propio usuario de MySQL, con permisos solo sobre sus tablas; la cuenta de administración solo la usan el migrador y el sembrador.
+- Cada proceso recibe solo las claves que usa (`env -u` en `docker/iniciar.sh`).
+- Las llamadas entre módulos y las tareas programadas usan tokens comparados en tiempo constante.
+- Todas las consultas son parametrizadas (PDO). Los errores al usuario son genéricos; el detalle queda en los logs, que nunca incluyen contraseñas, cookies ni tokens.
+- Nada secreto en el repo: `.env`, claves y `ca.pem` están en `.gitignore`.
 
-Pruebas públicas (reemplazar la URL por la URL real del servicio):
-
-```text
-https://<SERVICIO-RENDER>.onrender.com/api/backend/salud
-https://<DOMINIO-VERCEL>/api/backend/salud
-```
-
-La primera comprueba el servicio publicado directamente; la segunda también comprueba la reescritura de Vercel.
-
-En Render, las variables de entorno y los Secret Files se configuran en el panel del servicio. No se transfieren automáticamente desde el `.env` local. Para el certificado, usá la ruta que realmente exista en el contenedor de Render.
-
-## Seguridad y consideraciones
-
-- No subir `.env`, contraseñas, `JWT_PRIVATE_KEY`, tokens ni archivos de claves al repositorio.
-- El Gateway y los módulos distintos de Backend no deben recibir la clave privada JWT; la clave pública puede utilizarse para verificar tokens.
-- Las contraseñas de los usuarios deben almacenarse con hash; las consultas SQL deben ser parametrizadas.
-- La cookie de sesión del Backend está configurada con `HttpOnly`, `Secure` y `SameSite=Strict`.
-- El Frontend incluye el token CSRF en `X-CSRF-Token` para operaciones modificadoras cuando dispone de él. La verificación del lado servidor debe estar implementada y probada antes de dar por finalizada la protección CSRF; en una versión revisada de `comun/auth.php` aparecía como pendiente.
-- Los errores enviados al usuario deben ser genéricos. Los detalles técnicos se consultan en los logs y nunca deben incluir contraseñas, cookies o tokens.
-- Que `/api/backend/salud` responda `200 OK` demuestra conectividad básica y que se pudo ejecutar `SELECT 1`; no demuestra que las tablas, el registro, el login y todos los endpoints de Inventario estén completos.
+---
 
 ## Problemas frecuentes
 
-**`502 Bad Gateway`**
-
-Nginx no pudo comunicarse con el proceso del módulo de destino. Revisá `docker compose ps`, `docker compose logs --tail=100 app` y que el proceso PHP correspondiente esté iniciado en `docker/iniciar.sh`.
-
-**`503` en `/api/backend/salud`**
-
-El Backend no pudo conectarse a la base. Verificá `DB_HOST`, `DB_PORT`, `DB_NAME`, usuario, contraseña, `DB_SSL_CA` y que el certificado sea legible dentro del contenedor.
-
-**`500` al registrar un usuario**
-
-Revisá los logs de Render. La tabla `usuario` debe existir en la base configurada y la cuenta utilizada por Backend necesita los permisos definidos en `base/permisos/001_backend_usuario.sql`. El mensaje que recibe el cliente es genérico a propósito.
-
-**Catálogo vacío o error al consultar productos**
-
-Comprobá que Inventario esté implementado, que su proceso esté iniciado y que existan las tablas y productos necesarios. El Frontend consulta `/api/tienda/productos`; la migración `001_backend_usuario.sql` no crea tablas de productos.
-
-## Estado y alcance actual
-
-- La base de infraestructura común, las rutas del Gateway y el endpoint de salud del Backend se probaron localmente.
-- El registro y el inicio de sesión se lograron probar tras crear la tabla `usuario` y configurar las migraciones.
-- El catálogo del Frontend ya está preparado para usar `/api/tienda/productos` y `/api/tienda/productos/{id}`, pero su funcionamiento depende de la implementación disponible en Inventario y de tener productos cargados.
-- Verificá nuevamente cada flujo tras actualizar submódulos o variables de entorno; los cambios locales, de Render y de Aiven son configuraciones distintas.
-
-## Documentación relacionada
-
-- `api/CONTRATO_API_ApiGateway.md`: prefijos, rutas y responsabilidades de enrutamiento.
-- `Backend/docs/api/contrato.md`: contrato de autenticación del módulo Backend.
-- `Backend/SEGURIDAD.md`: decisiones de seguridad del Backend.
-- `compose.yaml`, `Dockerfile`, `docker/iniciar.sh` y `docker/nginx.conf`: configuración de ejecución.
+| Síntoma | Qué revisar |
+| --- | --- |
+| `502 Bad Gateway` | El proceso del módulo no está levantado. `docker compose logs app` y buscar `[AVISO]` |
+| `503` en una salud | El módulo no llega a la base: `DB_HOST`, `DB_PORT`, usuario, contraseña y `DB_SSL_CA` |
+| `500` con `Unknown column` o `Table doesn't exist` | Falta correr el migrador en ese entorno |
+| Error SSL `verify code 19` en el migrador | El `ca.pem` no es el de esa instancia de Aiven |
+| `Access denied` en el migrador | El usuario administrador o su contraseña no son los de esa base |
+| El WhatsApp no llega (error 131030) | Con el número de prueba de Meta, el destinatario tiene que estar verificado en la app de Meta |
+| La primera carga tarda un minuto | Render apaga el servicio tras 15 minutos sin visitas |
