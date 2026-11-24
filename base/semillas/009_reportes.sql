@@ -72,3 +72,28 @@ ON DUPLICATE KEY UPDATE
   hora = VALUES(hora),
   motivo = VALUES(motivo),
   estado = VALUES(estado);
+
+-- Cada turno ATENDIDO tiene su consulta finalizada y su factura, como cuando la veterinaria finaliza una
+-- consulta (24/11: sin esto, "Ver en el historial" de Mis turnos llevaba a un historial vacío).
+-- Consulta y factura con el mismo id que el turno (C-000951...).
+INSERT INTO consulta (id, turno_id, diagnostico, observaciones, valor_base, estado, finalizada_en)
+SELECT t.id, t.id,
+       IF(t.motivo = 'VACUNACION', 'Vacunación de rutina: sin novedades.', 'Control general: sano.'),
+       NULL, 15000.00, 'FINALIZADA', TIMESTAMP(t.fecha, t.hora) + INTERVAL 25 MINUTE
+FROM turno t
+WHERE t.id BETWEEN 951 AND 962
+ON DUPLICATE KEY UPDATE
+  turno_id = VALUES(turno_id), diagnostico = VALUES(diagnostico), observaciones = VALUES(observaciones),
+  valor_base = VALUES(valor_base), estado = VALUES(estado), finalizada_en = VALUES(finalizada_en);
+
+INSERT INTO factura_consulta
+  (id, numero, consulta_id, subtotal_base, subtotal_insumos, subtotal_productos, total,
+   huellitas_usadas, estado, fecha)
+SELECT c.id, CONCAT('C-', LPAD(c.id, 6, '0')), c.id, 15000.00, 0.00, 0.00, 15000.00, NULL, 'PAGADA', c.finalizada_en
+FROM consulta c
+WHERE c.id BETWEEN 951 AND 962
+ON DUPLICATE KEY UPDATE
+  numero = VALUES(numero), consulta_id = VALUES(consulta_id), subtotal_base = VALUES(subtotal_base),
+  subtotal_insumos = VALUES(subtotal_insumos), subtotal_productos = VALUES(subtotal_productos),
+  total = VALUES(total), huellitas_usadas = VALUES(huellitas_usadas), estado = VALUES(estado),
+  fecha = VALUES(fecha);
