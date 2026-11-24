@@ -43,28 +43,34 @@ UPDATE turno
 SET estado = 'CANCELADO'
 WHERE id BETWEEN 951 AND 962;
 
+-- Si en ese horario ya hay otro turno activo de la veterinaria (por ejemplo, uno cargado a mano en
+-- dev), el de acá queda CANCELADO en lugar de hacer fallar la semilla (el índice único no deja dos
+-- turnos activos a la misma hora). Lo mismo hace la semilla de producción (24/11).
 INSERT INTO turno
   (id, mascota_id, veterinario_id, fecha, hora, motivo, estado)
-VALUES
+SELECT d.id, d.mascota, 101, d.fecha, d.hora, d.motivo,
+       IF(EXISTS (SELECT 1 FROM turno o
+                  WHERE o.veterinario_id = 101 AND o.fecha = d.fecha AND o.hora = d.hora
+                    AND o.estado <> 'CANCELADO' AND o.id NOT BETWEEN 951 AND 962),
+          'CANCELADO', 'ATENDIDO')
+FROM (
   -- Lunes a la mañana: solo 2 turnos en las últimas 4 semanas (la franja con menor ocupación).
-  (951, 101, 101, @lunes_sem1,                   '07:00', 'CONSULTA',   'ATENDIDO'),
-  (952, 102, 101, @lunes_sem2,                   '07:00', 'VACUNACION', 'ATENDIDO'),
-
+            SELECT 951 AS id, 101 AS mascota, @lunes_sem1 AS fecha, '07:00:00' AS hora, 'CONSULTA' AS motivo
+  UNION ALL SELECT 952, 102, @lunes_sem2,                  '07:00:00', 'VACUNACION'
   -- Lunes a la tarde: 4 turnos.
-  (953, 101, 101, @lunes_sem1,                   '19:00', 'CONSULTA',   'ATENDIDO'),
-  (954, 102, 101, @lunes_sem1,                   '19:30', 'CONSULTA',   'ATENDIDO'),
-  (955, 103, 101, @lunes_sem2,                   '19:00', 'VACUNACION', 'ATENDIDO'),
-  (956, 104, 101, @lunes_sem3,                   '19:00', 'CONSULTA',   'ATENDIDO'),
-
+  UNION ALL SELECT 953, 101, @lunes_sem1,                  '19:00:00', 'CONSULTA'
+  UNION ALL SELECT 954, 102, @lunes_sem1,                  '19:30:00', 'CONSULTA'
+  UNION ALL SELECT 955, 103, @lunes_sem2,                  '19:00:00', 'VACUNACION'
+  UNION ALL SELECT 956, 104, @lunes_sem3,                  '19:00:00', 'CONSULTA'
   -- Martes a la mañana: 3 turnos.
-  (957, 101, 101, @lunes_sem1 + INTERVAL 1 DAY,  '07:00', 'CONSULTA',   'ATENDIDO'),
-  (958, 102, 101, @lunes_sem2 + INTERVAL 1 DAY,  '07:00', 'CONSULTA',   'ATENDIDO'),
-  (959, 103, 101, @lunes_sem3 + INTERVAL 1 DAY,  '07:00', 'VACUNACION', 'ATENDIDO'),
-
+  UNION ALL SELECT 957, 101, @lunes_sem1 + INTERVAL 1 DAY, '07:00:00', 'CONSULTA'
+  UNION ALL SELECT 958, 102, @lunes_sem2 + INTERVAL 1 DAY, '07:00:00', 'CONSULTA'
+  UNION ALL SELECT 959, 103, @lunes_sem3 + INTERVAL 1 DAY, '07:00:00', 'VACUNACION'
   -- Martes a la tarde: 3 turnos.
-  (960, 101, 101, @lunes_sem1 + INTERVAL 1 DAY,  '19:00', 'CONSULTA',   'ATENDIDO'),
-  (961, 102, 101, @lunes_sem2 + INTERVAL 1 DAY,  '19:00', 'CONSULTA',   'ATENDIDO'),
-  (962, 104, 101, @lunes_sem3 + INTERVAL 1 DAY,  '19:00', 'CONSULTA',   'ATENDIDO')
+  UNION ALL SELECT 960, 101, @lunes_sem1 + INTERVAL 1 DAY, '19:00:00', 'CONSULTA'
+  UNION ALL SELECT 961, 102, @lunes_sem2 + INTERVAL 1 DAY, '19:00:00', 'CONSULTA'
+  UNION ALL SELECT 962, 104, @lunes_sem3 + INTERVAL 1 DAY, '19:00:00', 'CONSULTA'
+) d
 ON DUPLICATE KEY UPDATE
   mascota_id = VALUES(mascota_id),
   veterinario_id = VALUES(veterinario_id),
@@ -72,6 +78,13 @@ ON DUPLICATE KEY UPDATE
   hora = VALUES(hora),
   motivo = VALUES(motivo),
   estado = VALUES(estado);
+
+-- Un turno que quedó cancelado no tiene consulta: se borra la de una carga anterior (con su factura).
+DELETE f FROM factura_consulta f JOIN turno t ON t.id = f.consulta_id
+  WHERE t.id BETWEEN 951 AND 962 AND t.estado <> 'ATENDIDO';
+UPDATE evento_sanitario SET consulta_id = NULL WHERE consulta_id BETWEEN 951 AND 962;
+DELETE c FROM consulta c JOIN turno t ON t.id = c.turno_id
+  WHERE c.id BETWEEN 951 AND 962 AND t.estado <> 'ATENDIDO';
 
 -- Cada turno ATENDIDO tiene su consulta finalizada y su factura, como cuando la veterinaria finaliza una
 -- consulta (24/11: sin esto, "Ver en el historial" de Mis turnos llevaba a un historial vacío).
@@ -81,7 +94,7 @@ SELECT t.id, t.id,
        IF(t.motivo = 'VACUNACION', 'Vacunación de rutina: sin novedades.', 'Control general: sano.'),
        NULL, 15000.00, 'FINALIZADA', TIMESTAMP(t.fecha, t.hora) + INTERVAL 25 MINUTE
 FROM turno t
-WHERE t.id BETWEEN 951 AND 962
+WHERE t.id BETWEEN 951 AND 962 AND t.estado = 'ATENDIDO'
 ON DUPLICATE KEY UPDATE
   turno_id = VALUES(turno_id), diagnostico = VALUES(diagnostico), observaciones = VALUES(observaciones),
   valor_base = VALUES(valor_base), estado = VALUES(estado), finalizada_en = VALUES(finalizada_en);
@@ -101,13 +114,18 @@ ON DUPLICATE KEY UPDATE
 -- Las vacunas y desparasitaciones que la semilla 005 deja aplicadas se aplicaron en una consulta,
 -- como en el sistema (CalendarioSanitario::marcarAplicado, al finalizar la consulta de un turno de
 -- vacunación). 24/11: antes quedaban aplicadas sin consulta y el historial de la mascota salía vacío.
---   Michi (102): la desparasitación interna (evento 103), en la consulta del turno 952.
---   Luna (103): la 1.ª dosis de la séxtuple (evento 105), en la consulta del turno 959.
-UPDATE consulta SET diagnostico = 'Desparasitación interna: sin novedades.' WHERE id = 952;
-UPDATE consulta SET diagnostico = 'Aplicación de la 1.ª dosis de la vacuna séxtuple.' WHERE id = 959;
+--   Michi (102): la desparasitación interna (evento 103); Luna (103): la 1.ª dosis de la séxtuple
+--   (evento 105). Cada uno, en la primera consulta de esa mascota de los turnos de arriba (si su
+--   horario estaba ocupado y quedó cancelado, en la siguiente).
+SET @consulta_michi = (SELECT MIN(c.id) FROM consulta c JOIN turno t ON t.id = c.turno_id
+                       WHERE c.id BETWEEN 951 AND 962 AND t.mascota_id = 102);
+SET @consulta_luna  = (SELECT MIN(c.id) FROM consulta c JOIN turno t ON t.id = c.turno_id
+                       WHERE c.id BETWEEN 951 AND 962 AND t.mascota_id = 103);
+UPDATE consulta SET diagnostico = 'Desparasitación interna: sin novedades.' WHERE id = @consulta_michi;
+UPDATE consulta SET diagnostico = 'Aplicación de la 1.ª dosis de la vacuna séxtuple.' WHERE id = @consulta_luna;
 
 UPDATE evento_sanitario e
-  JOIN consulta c ON c.id = CASE e.id WHEN 103 THEN 952 WHEN 105 THEN 959 END
+  JOIN consulta c ON c.id = IF(e.id = 103, @consulta_michi, @consulta_luna)
   SET e.fecha_programada = DATE(c.finalizada_en),
       e.fecha_aplicada = DATE(c.finalizada_en),
       e.consulta_id = c.id
