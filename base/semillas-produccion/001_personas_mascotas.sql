@@ -71,6 +71,10 @@ ON DUPLICATE KEY UPDATE
   nombre = VALUES(nombre), email = VALUES(email), password_hash = VALUES(password_hash),
   telefono = VALUES(telefono), rol = VALUES(rol), organizacion = VALUES(organizacion),
   estado_validacion = VALUES(estado_validacion);
+-- Cuándo los aprobó la veterinaria de la demo (migración 022): hace entre 6 y 8 meses.
+UPDATE usuario SET validado_en = UTC_TIMESTAMP() - INTERVAL 3 HOUR - INTERVAL (180 + (id - 3041) * 15) DAY,
+                   validado_por = @vet, motivo_rechazo = NULL
+WHERE id BETWEEN 3041 AND 3045 AND rol = 'RESCATISTA';
 
 -- Mascotas de los clientes de fondo: dos cada uno. Nombre, especie y raza salen de listas reales;
 -- la edad va de cachorro a senior.

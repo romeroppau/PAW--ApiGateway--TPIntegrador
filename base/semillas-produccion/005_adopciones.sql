@@ -37,6 +37,10 @@ DELETE po FROM postulacion po
 DELETE a FROM adopcion a
   JOIN publicacion pu ON pu.id = a.publicacion_id
   WHERE pu.mascota_id BETWEEN 30101 AND 30144 AND a.id NOT BETWEEN 30001 AND 30044;
+-- El historial de rechazos (migración 023) de estas mascotas: se vuelve a cargar abajo.
+DELETE pr FROM publicacion_rechazo pr
+  JOIN publicacion pu ON pu.id = pr.publicacion_id
+  WHERE pu.mascota_id BETWEEN 30101 AND 30144;
 DELETE FROM publicacion
   WHERE mascota_id BETWEEN 30101 AND 30144 AND id NOT BETWEEN 30001 AND 30044;
 DELETE FROM postulacion WHERE adopcion_id BETWEEN 30001 AND 30044;
@@ -136,6 +140,13 @@ ON DUPLICATE KEY UPDATE
   descripcion = VALUES(descripcion), foto = VALUES(foto), foto_tipo = VALUES(foto_tipo),
   estado_moderacion = VALUES(estado_moderacion), motivo_rechazo = VALUES(motivo_rechazo),
   activa = VALUES(activa), creada_en = VALUES(creada_en);
+
+-- 5b. El historial de rechazos (migración 023): las rechazadas, unas horas después de publicarse.
+INSERT INTO publicacion_rechazo (id, publicacion_id, motivo, rechazada_en, rechazada_por)
+SELECT 30000 + i, 30000 + i, 'La foto no muestra bien a la mascota: subí una más clara.', creada + INTERVAL 3 HOUR, @vet
+FROM prod_adopcion WHERE i BETWEEN 17 AND 18
+ON DUPLICATE KEY UPDATE publicacion_id = VALUES(publicacion_id), motivo = VALUES(motivo),
+  rechazada_en = VALUES(rechazada_en), rechazada_por = VALUES(rechazada_por);
 
 -- 6. Las adopciones (las publicaciones pendientes o rechazadas no tienen).
 INSERT INTO adopcion (id, publicacion_id, estado, adoptante_id, turno_chequeo_id, fecha_inicio, fecha_fin)

@@ -54,8 +54,19 @@ pedir GET /api/rescatistas
 esperar "La veterinaria ve las rescatistas pendientes" 200 '"email":"rescatista2@prueba.huellavet"'
 pedir GET '/api/rescatistas?estado=APROBADO'
 esperar "Y, filtrando, las aprobadas" 200 '"email":"rescatista@prueba.huellavet"'
+esperar "  con la fecha y hora en que se la aprobó" 200 '"validado_en":"20'
+pedir GET '/api/rescatistas?estado=APROBADO&buscar=huellitas'
+esperar "Se buscan por organización" 200 '"email":"rescatista@prueba.huellavet"'
+pedir GET '/api/rescatistas?estado=APROBADO&buscar=nadie-se-llama-asi'
+esperar "  y si nadie coincide, la lista vacía" 200 '"rescatistas":[]'
+pedir GET '/api/rescatistas?estado=APROBADO&desde=2026-13-01'
+esperar "Una fecha inválida da 400 con el campo" 400 '"desde"'
 pedir GET '/api/rescatistas?estado=OTRO'
 esperar "Un estado que no existe da 400" 400
+pedir GET /api/rescatistas/104
+esperar "La veterinaria ve el perfil de una rescatista" 200 '"organizacion":"Refugio Huellitas"'
+pedir GET /api/rescatistas/102
+esperar "Un cliente no tiene perfil de rescatista (404)" 404
 
 CSRF_VET=$CSRF
 CSRF=""
@@ -67,13 +78,45 @@ pedir POST /api/rescatistas/102/aprobar
 esperar "Un cliente no es un rescatista (404)" 404
 pedir POST /api/rescatistas/abc/aprobar
 esperar "Un id que no es un número da 404" 404
-pedir POST /api/rescatistas/104/rechazar
+pedir POST /api/rescatistas/104/rechazar '{"motivo":"Probando"}'
 esperar "Una rescatista ya aprobada no se rechaza (409)" 409 'ya fue aprobado'
 
 pedir POST /api/rescatistas/105/aprobar
 esperar "La veterinaria aprueba a la rescatista pendiente" 200 '"estado_validacion":"APROBADO"'
-pedir POST /api/rescatistas/105/rechazar
+pedir POST /api/rescatistas/105/rechazar '{"motivo":"Probando"}'
 esperar "La decisión es una sola: después no se rechaza (409)" 409
+
+# Rechazar pide el motivo. Se prueba con una cuenta de rescatista nueva (con el código del WhatsApp:
+# en local y en el CI la respuesta lo trae), así no se toca a las de prueba.
+EMAIL_RECHAZO="rescatista-rechazo-$(date +%s)-$RANDOM@prueba.huellavet"
+TEL_RECHAZO="11556$(printf '%05d' $((RANDOM % 100000)))"
+cerrar_sesion
+pedir POST /api/auth/registro/codigo "{\"telefono\":\"$TEL_RECHAZO\"}"
+COD_RECHAZO=$(printf '%s' "$RESPUESTA" | grep -o '"codigo":"[0-9]*"' | cut -d'"' -f4)
+pedir POST /api/auth/registro/rescatista "{\"nombre\":\"Rescatista Para Rechazar\",\"email\":\"$EMAIL_RECHAZO\",\"password\":\"Rescatista-Prueba-2026\",\"telefono\":\"$TEL_RECHAZO\",\"organizacion\":\"Refugio Dudoso\",\"codigo\":\"$COD_RECHAZO\"}"
+esperar "Se registra una rescatista nueva para rechazarla" 201
+RESCATISTA_RECHAZO=$(primer_id)
+iniciar_sesion "$EMAIL_RECHAZO" 'Rescatista-Prueba-2026'
+SESION_RECHAZO=$SESION
+iniciar_sesion vet@prueba.huellavet 'Vet-Prueba-2026'
+pedir POST "/api/rescatistas/${RESCATISTA_RECHAZO:-0}/rechazar"
+esperar "Rechazar sin motivo da 400" 400 '"motivo"'
+pedir POST "/api/rescatistas/${RESCATISTA_RECHAZO:-0}/rechazar" '{"motivo":"no"}'
+esperar "  y un motivo muy corto, también" 400 'entre 3 y 255'
+pedir POST "/api/rescatistas/${RESCATISTA_RECHAZO:-0}/rechazar" '{"motivo":"No pudimos verificar el refugio"}'
+esperar "La veterinaria la rechaza con el motivo" 200 '"motivo_rechazo":"No pudimos verificar el refugio"'
+pedir GET '/api/rescatistas?estado=RECHAZADO&buscar=dudoso'
+esperar "Queda en los rechazados, con el motivo" 200 '"motivo_rechazo":"No pudimos verificar el refugio"'
+esperar "  y la fecha y hora" 200 '"validado_en":"20'
+pedir GET "/api/rescatistas/${RESCATISTA_RECHAZO:-0}"
+esperar "Y en su perfil" 200 '"estado_validacion":"RECHAZADO"'
+SESION_VET=$SESION
+SESION=$SESION_RECHAZO
+pedir GET /api/notificaciones
+esperar "A la rescatista le llega el aviso con el motivo" 200 'Motivo: No pudimos verificar el refugio.'
+pedir GET /api/rescatistas/104
+esperar "Una rescatista no ve perfiles de rescatistas (403)" 403
+SESION=$SESION_VET
 
 SESION=$SESION_RESCATISTA2
 CSRF=$CSRF_RESCATISTA2
@@ -142,6 +185,17 @@ pedir POST /api/adopciones/publicaciones/102/rechazar '{"motivo":""}'
 esperar "Rechazar sin motivo da 400" 400 '"motivo"'
 pedir POST /api/adopciones/publicaciones/102/rechazar '{"motivo":"La foto no se ve bien"}'
 esperar "La veterinaria rechaza la publicación de Rocco" 200 '"motivo_rechazo":"La foto no se ve bien"'
+pedir GET '/api/adopciones/rechazos?buscar=rocco'
+esperar "El rechazo queda en el historial, con el motivo" 200 '"motivo":"La foto no se ve bien"'
+esperar "  y la veterinaria que lo hizo" 200 '"veterinaria":"Dra. Laura Mart'
+pedir GET '/api/adopciones/rechazos?rescatista_id=104&desde=2026-13-01'
+esperar "Una fecha inválida en el historial da 400" 400 '"desde"'
+pedir GET '/api/adopciones/moderacion?estado=APROBADA&buscar=pipa'
+esperar "La veterinaria ve las publicaciones aprobadas, con la fecha" 200 '"aprobada_en":"20'
+pedir GET '/api/adopciones/moderacion?estado=TODAS&rescatista_id=104'
+esperar "Y todas las de una rescatista (su perfil), también la rechazada" 200 '"estado_moderacion":"RECHAZADA"'
+pedir GET '/api/adopciones/moderacion?estado=OTRO'
+esperar "Un estado que no existe da 400" 400 '"estado"'
 pedir POST "/api/adopciones/publicaciones/${PUBLICACION_CANELA:-0}/aprobar"
 esperar "La veterinaria aprueba la de Canela: se abre la adopción" 200 '"estado":"PUBLICADA"'
 ADOPCION_CANELA=$(printf '%s' "$RESPUESTA" | grep -o '"adopcion":{"id":[0-9]*' | grep -o '[0-9]*$')
@@ -188,6 +242,19 @@ esperar "La rescatista elige al cliente 103" 200 '"estado":"ADOPTANTE_ELEGIDO"'
 esperar "Y la otra postulación queda rechazada" 200 '"estado":"RECHAZADA"'
 pedir POST /api/adopciones/101/elegir "{\"postulacion_id\":${POSTULACION_CLIENTE2:-0}}"
 esperar "No se elige dos veces (409)" 409
+
+# Pipa ya no está disponible, pero quien se postuló la sigue viendo (desde "Mis postulaciones").
+cerrar_sesion
+pedir GET /api/adopciones/publicaciones/101
+esperar "Sin sesión, una publicación que ya no está disponible da 404" 404
+iniciar_sesion cliente2@prueba.huellavet 'Cliente-Prueba-2026'
+pedir GET /api/adopciones/publicaciones/101
+esperar "El cliente elegido sigue viendo la publicación" 200 '"titulo":"Pipa busca familia"'
+pedir GET /api/adopciones/publicaciones/101/foto
+esperar "  y su foto" 200
+iniciar_sesion cliente@prueba.huellavet 'Cliente-Prueba-2026'
+pedir GET /api/adopciones/publicaciones/101
+esperar "El que no fue elegido también (se postuló)" 200 '"titulo":"Pipa busca familia"'
 
 # --- Chequeo y cierre (veterinaria) ---
 iniciar_sesion vet@prueba.huellavet 'Vet-Prueba-2026'
@@ -271,13 +338,23 @@ esperar "Pero ve el detalle de su adopción" 200 '"estado":"FINALIZADA"'
 pedir GET /api/notificaciones
 esperar "A la rescatista le llegó el aviso del turno del chequeo" 200 'tiene turno para el chequeo de adopción de Pipa'
 
-# --- Cancelar ---
+# --- Dar de baja con postulantes (24/11: no hay más "cancelar"; la baja es la única forma) ---
 pedir POST "/api/adopciones/${ADOPCION_CANELA:-0}/cancelar"
-esperar "La rescatista cancela la adopción de Canela" 200 '"estado":"CANCELADA"'
-pedir POST "/api/adopciones/${ADOPCION_CANELA:-0}/cancelar"
-esperar "Una adopción terminada no se cancela (409)" 409
+esperar "Cancelar una adopción ya no existe (404)" 404
+iniciar_sesion cliente@prueba.huellavet 'Cliente-Prueba-2026'
+pedir POST "/api/adopciones/${ADOPCION_CANELA:-0}/postulaciones" "$POSTULACION"
+esperar "El cliente 102 se postula a Canela" 201 '"estado":"PENDIENTE"'
+iniciar_sesion rescatista@prueba.huellavet 'Rescatista-Prueba-2026'
+pedir DELETE "/api/adopciones/publicaciones/${PUBLICACION_CANELA:-0}"
+esperar "La rescatista da de baja la publicación de Canela, que tenía un postulante" 204
+pedir GET "/api/adopciones/${ADOPCION_CANELA:-0}/postulaciones"
+esperar "  su adopción queda cancelada" 200 '"estado":"CANCELADA"'
 pedir GET /api/pacientes/mascotas/901
-esperar "Canela sigue a cargo de la rescatista" 200 '"nombre":"Canela"'
+esperar "  y Canela sigue a cargo de la rescatista" 200 '"nombre":"Canela"'
+iniciar_sesion cliente@prueba.huellavet 'Cliente-Prueba-2026'
+pedir GET /api/notificaciones
+esperar "Al postulante le llega el aviso de la baja" 200 'La publicación de Canela se dio de baja'
+iniciar_sesion rescatista@prueba.huellavet 'Rescatista-Prueba-2026'
 
 # --- Editar y dar de baja publicaciones ---
 pedir PUT /api/adopciones/publicaciones/102 '{"titulo":"ab"}'
@@ -285,11 +362,23 @@ esperar "Editar con un título muy corto da 400" 400 '"titulo"'
 pedir PUT /api/adopciones/publicaciones/102 "{\"descripcion\":\"Perro de 2 a\u00f1os, tranquilo. Ahora con una foto mejor.\",\"foto\":\"$PNG_PRUEBA\"}"
 esperar "La rescatista edita la publicación rechazada de Rocco: vuelve a revisión" 200 '"estado_moderacion":"PENDIENTE"'
 esperar "Y se borra el motivo del rechazo" 200 '"motivo_rechazo":null'
+pedir GET /api/adopciones/rechazos
+esperar "La rescatista no ve el historial de rechazos (403)" 403
+SESION_RESCATISTA=$SESION
+CSRF_RESCATISTA=$CSRF
+iniciar_sesion vet@prueba.huellavet 'Vet-Prueba-2026'
+pedir GET '/api/adopciones/rechazos?buscar=rocco'
+esperar "Pero el rechazo sigue en el historial de la veterinaria" 200 '"motivo":"La foto no se ve bien"'
+esperar "  diciendo que ahora está otra vez por revisar" 200 '"estado_moderacion":"PENDIENTE"'
+pedir GET /api/adopciones/moderacion
+esperar "Y en Por revisar dice que ya se rechazó una vez" 200 '"veces_rechazada":1'
+SESION=$SESION_RESCATISTA
+CSRF=$CSRF_RESCATISTA
 pedir PUT "/api/adopciones/publicaciones/${PUBLICACION_CANELA:-0}" '{"titulo":"Canela"}'
 esperar "Una publicación cerrada no se edita (409)" 409
 
 pedir POST /api/adopciones/publicaciones "$CANELA"
-esperar "Canela se puede volver a publicar después de cancelar" 201
+esperar "Canela se puede volver a publicar después de darla de baja" 201
 PUBLICACION_CANELA2=$(primer_id)
 
 iniciar_sesion rescatista2@prueba.huellavet 'Rescatista-Prueba-2026'
@@ -305,11 +394,47 @@ ADOPCION_CANELA2=$(printf '%s' "$RESPUESTA" | grep -o '"adopcion":{"id":[0-9]*' 
 pedir DELETE /api/adopciones/publicaciones/102
 esperar "La veterinaria no da de baja publicaciones (403)" 403
 
+# --- Dar de baja con adoptante elegido y el chequeo programado ---
+iniciar_sesion cliente2@prueba.huellavet 'Cliente-Prueba-2026'
+pedir POST "/api/adopciones/${ADOPCION_CANELA2:-0}/postulaciones" "$POSTULACION"
+esperar "El cliente 103 se postula a la nueva publicación de Canela" 201
+POSTULACION_CANELA2=$(primer_id)
+iniciar_sesion rescatista@prueba.huellavet 'Rescatista-Prueba-2026'
+pedir POST "/api/adopciones/${ADOPCION_CANELA2:-0}/elegir" "{\"postulacion_id\":${POSTULACION_CANELA2:-0}}"
+esperar "La rescatista lo elige" 200 '"estado":"ADOPTANTE_ELEGIDO"'
+iniciar_sesion vet@prueba.huellavet 'Vet-Prueba-2026'
+for HORA in 18:10 18:00 17:50 17:40 17:30 17:20 17:10 17:00 16:50 16:40; do
+  pedir POST /api/pacientes/turnos "{\"mascota_id\":901,\"fecha\":\"$HOY\",\"hora\":\"$HORA\",\"motivo\":\"CHEQUEO_ADOPCION\"}"
+  [ "$CODIGO" = 201 ] && break
+done
+esperar "La veterinaria carga el turno de chequeo de Canela" 201 '"CHEQUEO_ADOPCION"'
+TURNO_CANELA=$(primer_id)
+pedir POST "/api/adopciones/${ADOPCION_CANELA2:-0}/chequeo" "{\"turno_id\":${TURNO_CANELA:-0}}"
+esperar "  y lo asocia a la adopción" 200 '"estado":"CHEQUEO_PENDIENTE"'
+
 iniciar_sesion rescatista@prueba.huellavet 'Rescatista-Prueba-2026'
 pedir DELETE "/api/adopciones/publicaciones/${PUBLICACION_CANELA2:-0}"
-esperar "La rescatista da de baja la publicación de Canela" 204
+esperar "La rescatista da de baja la publicación de Canela con el chequeo programado" 204
 pedir GET "/api/adopciones/${ADOPCION_CANELA2:-0}/postulaciones"
-esperar "Y su adopción queda cancelada" 200 '"estado":"CANCELADA"'
+esperar "  su adopción queda cancelada" 200 '"estado":"CANCELADA"'
+iniciar_sesion vet@prueba.huellavet 'Vet-Prueba-2026'
+pedir POST "/api/pacientes/turnos/${TURNO_CANELA:-0}/cancelar"
+esperar "El turno del chequeo se canceló solo (ya no se puede cancelar: 409)" 409
+pedir GET /api/notificaciones
+esperar "A la veterinaria le llega el aviso, con el turno cancelado" 200 'dio de baja la publicación de Canela: la adopción con Tomás Aguirre no sigue. Se canceló el turno del chequeo'
+iniciar_sesion cliente2@prueba.huellavet 'Cliente-Prueba-2026'
+pedir GET /api/notificaciones
+esperar "Y al adoptante, que se canceló su turno" 200 'la adopción no sigue. Se canceló tu turno del chequeo'
+pedir GET /api/adopciones/mis-postulaciones
+esperar "  y su postulación queda cerrada" 200 '"estado":"RECHAZADA"'
+
+# Cancelar el turno del chequeo es de proceso a proceso: desde afuera está bloqueado.
+CODIGO=$(curl --silent --max-time 60 -o /dev/null -w '%{http_code}' -X POST \
+  -H 'X-Servicio-Token: cualquiera' "$BASE_URL/internal/turnos/${TURNO_CANELA:-0}/cancelar-chequeo")
+RESPUESTA=""
+esperar "Cancelar el turno del chequeo no se puede llamar desde afuera (404)" 404
+
+iniciar_sesion rescatista@prueba.huellavet 'Rescatista-Prueba-2026'
 pedir DELETE "/api/adopciones/publicaciones/${PUBLICACION_CANELA2:-0}"
 esperar "No se da de baja dos veces (409)" 409
 pedir DELETE /api/adopciones/publicaciones/102
