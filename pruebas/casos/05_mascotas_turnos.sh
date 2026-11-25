@@ -65,7 +65,7 @@ MANIANA=$(date -u -d '-3 hours +1 day' +%Y-%m-%d)   # mañana en Argentina (UTC-
 iniciar_sesion vet@prueba.huellavet 'Vet-Prueba-2026'
 
 pedir POST /api/pacientes/turnos '{"mascota_id":101,"fecha":"2020-01-01","hora":"25:00","motivo":"PELUQUERIA"}'
-esperar "Un turno con datos inválidos da 400 con el error de cada campo" 400 '"motivo"'
+esperar "Un turno con datos inválidos da 400 con el error de cada campo" 400 '"motivos"'
 
 pedir POST /api/pacientes/turnos "{\"mascota_id\":101,\"fecha\":\"$MANIANA\",\"hora\":\"19:45\",\"motivo\":\"CONSULTA\"}"
 esperar "La veterinaria carga un turno para mañana" 201 '"estado":"PROGRAMADO"'
@@ -125,7 +125,7 @@ esperar "El cliente da de alta una mascota suya" 201 '"nombre":"Cachorro de humo
 MASCOTA_NUEVA=$(printf '%s' "$RESPUESTA" | grep -o '"id":[0-9]*' | head -1 | cut -d: -f2)
 
 pedir GET "/api/pacientes/mascotas/${MASCOTA_NUEVA:-0}/calendario-sanitario"
-esperar "Al darla de alta se le arma el calendario sanitario" 200 '"nombre":"Séxtuple (1.ª dosis)"'
+esperar "Al darla de alta no se le arma el calendario: lo carga la veterinaria (25/11)" 200 '"eventos":[]'
 
 pedir PUT "/api/pacientes/mascotas/${MASCOTA_NUEVA:-0}" "{\"nombre\":\"Cachorro editado\",\"especie\":\"PERRO\",\"fecha_nacimiento\":\"$NACIMIENTO\",\"peso_kg\":4.5}"
 esperar "El cliente edita su mascota" 200 '"peso_kg":"4.50"'

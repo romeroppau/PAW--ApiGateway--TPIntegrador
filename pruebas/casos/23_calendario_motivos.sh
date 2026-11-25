@@ -5,6 +5,8 @@
 #   - La veterinaria edita el calendario: agrega, marca como dada (por ejemplo, en otra veterinaria),
 #     cambia la fecha y quita.
 #   - La consulta de una vacuna lleva su insumo; sin stock no finaliza, y el stock se carga desde ahí.
+#   - El calendario no se arma solo, y una dosis se agrega con las anteriores ya dadas (25/11).
+#   - Un turno puede tener varios motivos (migración 026): acá, dos vacunas y un control.
 # Contratos: Pacientes docs/api/contrato-calendario.md, contrato-mascotas-turnos.md y contrato-consultas.md.
 # Usa a Michi (102, gato de cliente@) y la leucemia felina, que es opcional: no está en su calendario.
 es_entorno_de_prueba || return 0
@@ -44,36 +46,40 @@ pedir POST "$CAL" "{\"plan_sanitario_id\":14,\"fecha_programada\":\"$HOY_CAL\"}"
 esperar "El cliente no puede agregar al calendario (403)" 403
 iniciar_sesion vet@prueba.huellavet 'Vet-Prueba-2026'
 
-# --- Agregar al calendario ---
+# --- Agregar al calendario: cada dosis con las anteriores dadas ---
 pedir POST "$CAL" "{\"plan_sanitario_id\":14,\"fecha_programada\":\"$HOY_CAL\"}"
 esperar "La veterinaria agrega la 1.ª dosis de leucemia felina" 200 '"nombre":"Leucemia felina (1.ª dosis)","plan_sanitario_id":14'
-pedir POST "$CAL" "{\"plan_sanitario_id\":15,\"fecha_programada\":\"$MANIANA_CAL\"}"
-esperar "  y la 2.ª" 200 '"nombre":"Leucemia felina (2.ª dosis)","plan_sanitario_id":15'
 DOSIS1=$(evento_sin_dar 'Leucemia felina (1.ª dosis)')
-DOSIS2=$(evento_sin_dar 'Leucemia felina (2.ª dosis)')
 pedir POST "$CAL" "{\"plan_sanitario_id\":15,\"fecha_programada\":\"$MANIANA_CAL\"}"
+esperar "La 2.ª no se carga con la 1.ª sin dar" 409 'primero cargá y marcá como dadas: Leucemia felina (1.ª dosis)'
+pedir POST "$CAL" "{\"plan_sanitario_id\":16,\"fecha_programada\":\"$MANIANA_CAL\"}"
+esperar "  ni el refuerzo: dice todas las que faltan" 409 'Leucemia felina (1.ª dosis), Leucemia felina (2.ª dosis)'
+pedir POST "$CAL" "{\"plan_sanitario_id\":14,\"fecha_programada\":\"$MANIANA_CAL\"}"
 esperar "Agregar de nuevo una que está sin dar da 409" 409 'Ya está en el calendario'
 pedir POST "$CAL" "{\"plan_sanitario_id\":4,\"fecha_programada\":\"$MANIANA_CAL\"}"
 esperar "Una de otra especie da 400" 400 '"plan_sanitario_id"'
-pedir POST "$CAL" "{\"plan_sanitario_id\":16,\"fecha_programada\":\"$AYER_CAL\"}"
+pedir POST "$CAL" "{\"plan_sanitario_id\":14,\"fecha_programada\":\"$AYER_CAL\"}"
 esperar "Una fecha pasada da 400" 400 '"fecha_programada"'
 
-# --- El orden de las dosis ---
-turno_vacuna 15 17:10
-esperar "La 2.ª dosis no se agenda con la 1.ª sin dar" 409 'Antes de Leucemia felina (2.ª dosis) tiene que darse Leucemia felina (1.ª dosis)'
-pedir POST "$CAL/${DOSIS2:-0}/dada" "{\"fecha_aplicada\":\"$HOY_CAL\"}"
-esperar "  ni se marca como dada antes que la 1.ª" 409 'Primero marcá como dada: Leucemia felina (1.ª dosis)'
 pedir POST "$CAL/${DOSIS1:-0}/dada" "{\"fecha_aplicada\":\"$MANIANA_CAL\"}"
 esperar "Marcar como dada con una fecha futura da 400" 400 'no puede ser posterior a hoy'
 pedir POST "$CAL/${DOSIS1:-0}/dada" "{\"fecha_aplicada\":\"$HOY_CAL\"}"
 esperar "La 1.ª se marca como dada a mano (se la dieron en otra veterinaria)" 200 '"en_consulta":false'
+pedir POST "$CAL" "{\"plan_sanitario_id\":15,\"fecha_programada\":\"$MANIANA_CAL\"}"
+esperar "Con la 1.ª dada, ahora sí se carga la 2.ª" 200 '"nombre":"Leucemia felina (2.ª dosis)","plan_sanitario_id":15'
+DOSIS2=$(evento_sin_dar 'Leucemia felina (2.ª dosis)')
+TRIPLE=$(evento_sin_dar 'Triple felina (refuerzo anual)')
 
-# --- Ahora sí, el turno ---
-turno_vacuna 15 17:10
-esperar "Con la 1.ª dada, se saca el turno para la 2.ª" 201 "\"evento_sanitario\":{\"id\":${DOSIS2:-0},\"nombre\":\"Leucemia felina (2.ª dosis)\",\"aplicacion\":\"LEUCEMIA_FELINA\"}"
+# --- Un turno con varios motivos: dos vacunas y un control ---
+MOTIVOS="[{\"motivo\":\"VACUNACION\",\"plan_sanitario_id\":15},{\"motivo\":\"VACUNACION\",\"plan_sanitario_id\":11},{\"motivo\":\"CONTROL\"}]"
+pedir POST /api/pacientes/turnos "{\"mascota_id\":102,\"fecha\":\"$MANIANA_CAL\",\"hora\":\"17:10\",\"motivos\":$MOTIVOS}"
+esperar "Se saca un turno con dos vacunas y un control" 201 "\"motivos\":[{\"motivo\":\"VACUNACION\",\"evento_sanitario\":{\"id\":${DOSIS2:-0},\"nombre\":\"Leucemia felina (2.ª dosis)\",\"aplicacion\":\"LEUCEMIA_FELINA\"}},{\"motivo\":\"VACUNACION\",\"evento_sanitario\":{\"id\":${TRIPLE:-0},"
+esperar "  con el control al final" 201 '{"motivo":"CONTROL","evento_sanitario":null}]'
 TURNO_LEU=$(printf '%s' "$RESPUESTA" | grep -o '"id":[0-9]*' | head -1 | cut -d: -f2)
 turno_vacuna 15 17:20
 esperar "Un segundo turno para la misma dosis da 409" 409 'Michi ya tiene turno para Leucemia felina (2.ª dosis)'
+pedir POST /api/pacientes/turnos "{\"mascota_id\":102,\"fecha\":\"$MANIANA_CAL\",\"hora\":\"17:20\",\"motivos\":[{\"motivo\":\"CONTROL\"},{\"motivo\":\"CONTROL\"}]}"
+esperar "Un motivo repetido da 400" 400 'Hay un motivo repetido'
 pedir DELETE "$CAL/${DOSIS2:-0}"
 esperar "No se quita una dosis que tiene turno" 409 'cancelalo primero'
 pedir PUT "$CAL/${DOSIS2:-0}" "{\"fecha_programada\":\"$MANIANA_CAL\"}"
@@ -83,19 +89,24 @@ esperar "  a una fecha que no sea pasada" 400 'anterior a hoy'
 
 iniciar_sesion cliente@prueba.huellavet 'Cliente-Prueba-2026'
 pedir GET /api/notificaciones
-esperar "A la dueña le llega el aviso con la vacuna" 200 'turno de vacunación (Leucemia felina, 2.ª dosis) para Michi'
+esperar "A la dueña le llega el aviso con todos los motivos" 200 'turno de vacunación (Leucemia felina, 2.ª dosis), vacunación (Triple felina, refuerzo anual) y control para Michi'
 iniciar_sesion vet@prueba.huellavet 'Vet-Prueba-2026'
 
 # --- La consulta lleva la vacuna, y el stock se carga desde ahí ---
 pedir POST "/api/pacientes/turnos/${TURNO_LEU:-0}/atencion"
-esperar "La consulta dice qué vacuna se da y el insumo que sirve (sin stock)" 201 '"insumos":[{"id":191,"nombre":"Vacuna leucemia felina (dosis)","stock":0}]'
+esperar "La consulta dice qué vacunas se dan y el insumo que sirve para cada una" 201 '"insumos":[{"id":191,"nombre":"Vacuna leucemia felina (dosis)","stock":0}]'
+esperar "  (también la triple felina)" 201 '"insumos":[{"id":105,"nombre":"Vacuna triple felina (dosis)"'
 CONSULTA_LEU=$(printf '%s' "$RESPUESTA" | sed -n 's/^{"consulta":{"id":\([0-9]*\).*/\1/p')
 pedir PUT "/api/pacientes/consultas/${CONSULTA_LEU:-0}" '{"diagnostico":"Sano. Segunda dosis de leucemia felina."}'
 esperar "Se guarda el diagnóstico" 200 '"diagnostico":"Sano.'
 pedir POST "/api/pacientes/consultas/${CONSULTA_LEU:-0}/finalizar"
-esperar "Sin la vacuna en los insumos no se finaliza" 400 'cargá en los insumos la dosis que se da'
+esperar "Sin las vacunas en los insumos no se finaliza" 400 'Falta cargar en los insumos la dosis de: Leucemia felina (2.ª dosis), Triple felina (refuerzo anual).'
 pedir POST "/api/pacientes/consultas/${CONSULTA_LEU:-0}/insumos" '{"insumo_id":191,"cantidad":1}'
 esperar "Se carga la dosis (con su aplicación y su stock)" 201 '"aplicacion":"LEUCEMIA_FELINA","stock":0'
+pedir POST "/api/pacientes/consultas/${CONSULTA_LEU:-0}/finalizar"
+esperar "Falta la otra vacuna" 400 'Falta cargar en los insumos la dosis de: Triple felina (refuerzo anual).'
+pedir POST "/api/pacientes/consultas/${CONSULTA_LEU:-0}/insumos" '{"insumo_id":105,"cantidad":1}'
+esperar "Se carga la triple felina" 201 '"aplicacion":"TRIPLE_FELINA"'
 pedir POST "/api/pacientes/consultas/${CONSULTA_LEU:-0}/finalizar"
 esperar "Sin stock tampoco se finaliza" 409 'Stock insuficiente'
 pedir POST /api/inventario/insumos/191/stock '{"cantidad":3}'
@@ -104,8 +115,11 @@ pedir POST "/api/pacientes/consultas/${CONSULTA_LEU:-0}/finalizar"
 esperar "Ahora sí se finaliza" 200 '"numero":"C-'
 pedir GET "$CAL"
 esperar "La 2.ª dosis queda dada en esa consulta" 200 "\"id\":${DOSIS2:-0},\"tipo\":\"VACUNA\",\"nombre\":\"Leucemia felina (2.ª dosis)\",\"plan_sanitario_id\":15,\"aplicacion\":\"LEUCEMIA_FELINA\",\"fecha_programada\":\"$MANIANA_CAL\",\"fecha_aplicada\":\"$HOY_CAL\",\"en_consulta\":true"
+esperar "  y la triple felina también, con su próximo refuerzo agregado" 200 "\"id\":${TRIPLE:-0},\"tipo\":\"VACUNA\",\"nombre\":\"Triple felina (refuerzo anual)\",\"plan_sanitario_id\":11,\"aplicacion\":\"TRIPLE_FELINA\",\"fecha_programada\":\""
 pedir GET /api/inventario/insumos/191
 esperar "  y se descontó la dosis" 200 '"stock":2'
+pedir GET "/api/pacientes/mascotas/102/historial"
+esperar "El historial trae los motivos de la consulta" 200 '{"motivo":"CONTROL","evento_sanitario":null}'
 
 # --- Quitar del calendario ---
 pedir POST "$CAL" "{\"plan_sanitario_id\":16,\"fecha_programada\":\"$MANIANA_CAL\"}"

@@ -31,5 +31,8 @@ ON DUPLICATE KEY UPDATE
   fecha_aplicada = VALUES(fecha_aplicada),
   consulta_id = VALUES(consulta_id);
 
--- Migración 025: el turno 102 de hoy (vacunación de Luna) es para la séxtuple 2.ª dosis (evento 106).
-UPDATE turno SET evento_sanitario_id = 106 WHERE id = 102;
+-- Migraciones 025 y 026: el turno 102 de hoy (vacunación de Luna) es para la séxtuple 2.ª dosis
+-- (evento 106). Los demás turnos de las semillas no tienen filas en turno_motivo: Pacientes usa su
+-- turno.motivo como único motivo.
+DELETE FROM turno_motivo WHERE turno_id = 102;
+INSERT INTO turno_motivo (turno_id, motivo, evento_sanitario_id) VALUES (102, 'VACUNACION', 106);
