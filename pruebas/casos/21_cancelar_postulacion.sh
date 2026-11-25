@@ -1,5 +1,6 @@
 # shellcheck shell=bash
 # El cliente cancela su postulación (24/11): POST /api/adopciones/postulaciones/{id}/cancelar.
+# Después puede volver a postularse (la misma postulación vuelve a PENDIENTE).
 # Contrato: docs/api/contrato-adopciones.md de Adopciones ("Cancelar mi postulación"). Migración 021.
 # Arma su propia adopción (una mascota nueva de la rescatista 104, publicada y aprobada), así no
 # depende de lo que hizo 09_adopciones.sh con Pipa y Canela. Al final la da de baja.
@@ -44,10 +45,16 @@ esperar "El cliente cancela su postulación pendiente" 200 '"estado":"CANCELADA"
 esperar "  y la adopción, sin otras pendientes, vuelve a publicada" 200 '"adopcion":{"id":'"${ADOPCION_CANCELAR:-0}"',"estado":"PUBLICADA"'
 pedir POST "/api/adopciones/postulaciones/${POSTULACION_CANCELAR:-0}/cancelar"
 esperar "No se cancela dos veces (409)" 409
-pedir POST "/api/adopciones/${ADOPCION_CANCELAR:-0}/postulaciones" '{"tipo_vivienda":"Casa","otras_mascotas":"Ninguna","tiempo_disponible":"Toda la tarde"}'
-esperar "Y no se vuelve a postular por el mismo animal (409)" 409 'Ya te postulaste'
 pedir GET /api/adopciones/mis-postulaciones
 esperar "En Mis postulaciones figura cancelada" 200 '"estado":"CANCELADA"'
+
+# Puede volver a postularse (24/11): la misma postulación vuelve a PENDIENTE con los datos nuevos.
+pedir POST "/api/adopciones/${ADOPCION_CANCELAR:-0}/postulaciones" '{"tipo_vivienda":"Departamento","otras_mascotas":"Un gato","tiempo_disponible":"Las tardes"}'
+esperar "Después de cancelar, el cliente vuelve a postularse" 201 '"id":'"${POSTULACION_CANCELAR:-0}"',"estado":"PENDIENTE"'
+esperar "  con los datos nuevos" 201 '"tipo_vivienda":"Departamento"'
+esperar "  y la adopción vuelve a tener postulantes" 201 '"estado":"CON_POSTULANTES"'
+pedir POST "/api/adopciones/${ADOPCION_CANCELAR:-0}/postulaciones" '{"tipo_vivienda":"Casa","otras_mascotas":"Ninguna","tiempo_disponible":"Toda la tarde"}'
+esperar "Pero no dos veces seguidas (409)" 409 'Ya te postulaste'
 pedir POST /api/adopciones/postulaciones/101/cancelar
 esperar "Una postulación de otro cliente (la 101, de cliente@) da 404" 404
 
@@ -55,8 +62,9 @@ esperar "Una postulación de otro cliente (la 101, de cliente@) da 404" 404
 iniciar_sesion rescatista@prueba.huellavet 'Rescatista-Prueba-2026'
 pedir GET /api/notificaciones
 esperar "A la rescatista le llega el aviso de la cancelación" 200 'su postulación para adoptar a Gato para cancelar'
+esperar "  y el de la nueva postulación" 200 'se postuló para adoptar a Gato para cancelar'
 pedir GET "/api/adopciones/${ADOPCION_CANCELAR:-0}/postulaciones"
-esperar "  y ve la postulación cancelada" 200 '"estado":"CANCELADA"'
+esperar "  y ve la postulación otra vez pendiente" 200 '"estado":"PENDIENTE"'
 pedir DELETE "/api/adopciones/publicaciones/${PUBLICACION_CANCELAR:-0}"
 esperar "Limpieza: la rescatista da de baja la publicación" 204
 cerrar_sesion
