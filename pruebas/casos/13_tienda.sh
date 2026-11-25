@@ -71,6 +71,29 @@ pedir POST /api/tienda/carrito/items '{"producto_id":112,"cantidad":1}'
 esperar "Un rescatista puede agregar al carrito" 200 '"producto_id":112'
 cerrar_sesion
 
+# --- Retiro manual de stock de un producto (25/11), como en insumos ---
+iniciar_sesion vet@prueba.huellavet 'Vet-Prueba-2026'
+pedir POST /api/inventario/productos '{"nombre":"Producto para retirar stock","categoria":"ACCESORIO","especie":"TODAS","precio":100,"stock":5}'
+RETIRO=$(printf '%s' "$RESPUESTA" | grep -o '"id":[0-9]*' | head -1 | cut -d: -f2)
+pedir POST "/api/inventario/productos/$RETIRO/retiro" '{"cantidad":0}'
+esperar "Retirar una cantidad inválida da 400" 400 '"cantidad"'
+pedir POST "/api/inventario/productos/$RETIRO/retiro" '{"cantidad":6}'
+esperar "Retirar más de lo que hay da 409 con el stock" 409 '"stock":5'
+pedir POST "/api/inventario/productos/$RETIRO/retiro" '{"cantidad":2}'
+esperar "Retirar 2 de 5 deja 3" 200 '"stock":3'
+pedir GET "/api/inventario/productos/$RETIRO/movimientos"
+esperar "El retiro queda como salida por ajuste" 200 '"motivo":"AJUSTE"'
+pedir POST /api/inventario/productos/999999/retiro '{"cantidad":1}'
+esperar "Retirar de un producto que no existe da 404" 404
+pedir DELETE "/api/inventario/productos/$RETIRO"
+pedir POST "/api/inventario/productos/$RETIRO/retiro" '{"cantidad":1}'
+esperar "A un producto dado de baja no se le retira stock (409)" 409 '"El producto está dado de baja"'
+cerrar_sesion
+iniciar_sesion cliente@prueba.huellavet 'Cliente-Prueba-2026'
+pedir POST /api/inventario/productos/112/retiro '{"cantidad":1}'
+esperar "Un cliente no puede retirar stock (403)" 403
+cerrar_sesion
+
 # --- Un producto dado de baja no se puede agregar ---
 iniciar_sesion vet@prueba.huellavet 'Vet-Prueba-2026'
 pedir POST /api/inventario/productos '{"nombre":"Producto que se da de baja","categoria":"ACCESORIO","especie":"TODAS","precio":100,"stock":5}'
