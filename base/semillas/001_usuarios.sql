@@ -21,3 +21,11 @@ ON DUPLICATE KEY UPDATE
   intentos_fallidos = 0,
   primer_fallo_en = NULL,
   bloqueado_hasta = NULL;
+
+-- Cuándo se validó a cada rescatista (migración 022): Paula, aprobada hace un mes por la veterinaria;
+-- Nicolás sigue esperando (las pruebas lo aprueban).
+UPDATE usuario SET
+  validado_en    = IF(id = 104, UTC_TIMESTAMP() - INTERVAL 3 HOUR - INTERVAL 30 DAY, NULL),
+  validado_por   = IF(id = 104, 101, NULL),
+  motivo_rechazo = NULL
+WHERE id IN (104, 105);
