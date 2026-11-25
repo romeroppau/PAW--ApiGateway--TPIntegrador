@@ -41,3 +41,9 @@ iniciar_sesion cliente2@prueba.huellavet 'Cliente-Prueba-2026'
 pedir GET /api/pacientes/mascotas/103/historial
 esperar "La vacuna aplicada de Luna está en una consulta de su historial" 200 'séxtuple'
 cerrar_sesion
+
+# El historial dice el motivo de cada consulta (25/11): la 1.ª dosis de Luna fue en un turno de vacunación.
+iniciar_sesion cliente2@prueba.huellavet 'Cliente-Prueba-2026'
+pedir GET /api/pacientes/mascotas/103/historial
+esperar "El historial trae el motivo de cada consulta" 200 '"motivo":"VACUNACION"'
+cerrar_sesion
