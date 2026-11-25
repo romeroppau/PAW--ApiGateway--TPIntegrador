@@ -31,7 +31,11 @@ esperar "Se guarda el diagnóstico" 200 '"diagnostico":"Vacunacion de rutina"'
 
 pedir POST "/api/pacientes/consultas/$CONSULTA/insumos" "{\"insumo_id\":$INSUMO,\"cantidad\":2}"
 esperar "Se agrega el insumo a la consulta" 201 '"cantidad":2'
-ITEM=$(printf '%s' "$RESPUESTA" | sed -n 's/.*"insumos":\[{"id":\([0-9]*\).*/\1/p')
+ITEM=$(printf '%s' "$RESPUESTA" | grep -o '"id":[0-9]*,"insumo_id":'"$INSUMO" | head -1 | cut -d: -f2 | cut -d, -f1)
+
+# El turno 102 es para la séxtuple 2.ª dosis de Luna (migración 025): la consulta lleva la dosis.
+pedir POST "/api/pacientes/consultas/$CONSULTA/insumos" '{"insumo_id":104,"cantidad":1}'
+esperar "Se agrega la dosis de séxtuple (la vacuna del turno)" 201 '"insumo_id":104'
 
 pedir DELETE "/api/inventario/insumos/$INSUMO"
 esperar "Se da de baja el insumo" 204
@@ -43,7 +47,7 @@ pedir GET "/api/inventario/insumos/$INSUMO"
 esperar "El stock del insumo dado de baja no cambió" 200 '"stock":10'
 
 pedir DELETE "/api/pacientes/consultas/$CONSULTA/insumos/$ITEM"
-esperar "Se quita el insumo de la consulta" 200 '"insumos":[]'
+esperar "Se quita el insumo de la consulta (queda la séxtuple)" 200 '"insumos":[{"id":'
 
 # --- El total de la factura tiene que entrar en la columna, y se valida antes de descontar ---
 # (El valor de la consulta ya no se edita: se pasa del máximo con un insumo carísimo.)
@@ -62,7 +66,7 @@ pedir GET "/api/inventario/insumos/$CARO"
 esperar "El stock del insumo no cambió" 200 '"stock":10'
 
 pedir DELETE "/api/pacientes/consultas/$CONSULTA/insumos/$ITEM_CARO"
-esperar "Se quita el insumo carísimo" 200 '"insumos":[]'
+esperar "Se quita el insumo carísimo" 200 '"insumo_id":104'
 pedir DELETE "/api/inventario/insumos/$CARO"
 pedir POST "/api/pacientes/consultas/$CONSULTA/insumos" '{"insumo_id":101,"cantidad":1}'
 esperar "Se agrega una jeringa" 201 '"insumo_id":101'
