@@ -258,6 +258,9 @@ esperar "El que no fue elegido también (se postuló)" 200 '"titulo":"Pipa busca
 
 # --- Chequeo y cierre (veterinaria) ---
 iniciar_sesion vet@prueba.huellavet 'Vet-Prueba-2026'
+pedir GET /api/notificaciones
+esperar "A la veterinaria le llega que hay un chequeo por coordinar" 200 'Eligieron a Tomás Aguirre'
+esperar "  con lo que tiene que hacer" 200 'espera el turno del chequeo'
 pedir POST /api/adopciones/101/completar
 esperar "Sin chequeo no se completa (409)" 409
 pedir POST /api/adopciones/101/chequeo '{"turno_id":101}'
