@@ -54,8 +54,19 @@ pedir GET /api/rescatistas
 esperar "La veterinaria ve las rescatistas pendientes" 200 '"email":"rescatista2@prueba.huellavet"'
 pedir GET '/api/rescatistas?estado=APROBADO'
 esperar "Y, filtrando, las aprobadas" 200 '"email":"rescatista@prueba.huellavet"'
+esperar "  con la fecha y hora en que se la aprobó" 200 '"validado_en":"20'
+pedir GET '/api/rescatistas?estado=APROBADO&buscar=huellitas'
+esperar "Se buscan por organización" 200 '"email":"rescatista@prueba.huellavet"'
+pedir GET '/api/rescatistas?estado=APROBADO&buscar=nadie-se-llama-asi'
+esperar "  y si nadie coincide, la lista vacía" 200 '"rescatistas":[]'
+pedir GET '/api/rescatistas?estado=APROBADO&desde=2026-13-01'
+esperar "Una fecha inválida da 400 con el campo" 400 '"desde"'
 pedir GET '/api/rescatistas?estado=OTRO'
 esperar "Un estado que no existe da 400" 400
+pedir GET /api/rescatistas/104
+esperar "La veterinaria ve el perfil de una rescatista" 200 '"organizacion":"Refugio Huellitas"'
+pedir GET /api/rescatistas/102
+esperar "Un cliente no tiene perfil de rescatista (404)" 404
 
 CSRF_VET=$CSRF
 CSRF=""
@@ -67,13 +78,45 @@ pedir POST /api/rescatistas/102/aprobar
 esperar "Un cliente no es un rescatista (404)" 404
 pedir POST /api/rescatistas/abc/aprobar
 esperar "Un id que no es un número da 404" 404
-pedir POST /api/rescatistas/104/rechazar
+pedir POST /api/rescatistas/104/rechazar '{"motivo":"Probando"}'
 esperar "Una rescatista ya aprobada no se rechaza (409)" 409 'ya fue aprobado'
 
 pedir POST /api/rescatistas/105/aprobar
 esperar "La veterinaria aprueba a la rescatista pendiente" 200 '"estado_validacion":"APROBADO"'
-pedir POST /api/rescatistas/105/rechazar
+pedir POST /api/rescatistas/105/rechazar '{"motivo":"Probando"}'
 esperar "La decisión es una sola: después no se rechaza (409)" 409
+
+# Rechazar pide el motivo. Se prueba con una cuenta de rescatista nueva (con el código del WhatsApp:
+# en local y en el CI la respuesta lo trae), así no se toca a las de prueba.
+EMAIL_RECHAZO="rescatista-rechazo-$(date +%s)-$RANDOM@prueba.huellavet"
+TEL_RECHAZO="11556$(printf '%05d' $((RANDOM % 100000)))"
+cerrar_sesion
+pedir POST /api/auth/registro/codigo "{\"telefono\":\"$TEL_RECHAZO\"}"
+COD_RECHAZO=$(printf '%s' "$RESPUESTA" | grep -o '"codigo":"[0-9]*"' | cut -d'"' -f4)
+pedir POST /api/auth/registro/rescatista "{\"nombre\":\"Rescatista Para Rechazar\",\"email\":\"$EMAIL_RECHAZO\",\"password\":\"Rescatista-Prueba-2026\",\"telefono\":\"$TEL_RECHAZO\",\"organizacion\":\"Refugio Dudoso\",\"codigo\":\"$COD_RECHAZO\"}"
+esperar "Se registra una rescatista nueva para rechazarla" 201
+RESCATISTA_RECHAZO=$(primer_id)
+iniciar_sesion "$EMAIL_RECHAZO" 'Rescatista-Prueba-2026'
+SESION_RECHAZO=$SESION
+iniciar_sesion vet@prueba.huellavet 'Vet-Prueba-2026'
+pedir POST "/api/rescatistas/${RESCATISTA_RECHAZO:-0}/rechazar"
+esperar "Rechazar sin motivo da 400" 400 '"motivo"'
+pedir POST "/api/rescatistas/${RESCATISTA_RECHAZO:-0}/rechazar" '{"motivo":"no"}'
+esperar "  y un motivo muy corto, también" 400 'entre 3 y 255'
+pedir POST "/api/rescatistas/${RESCATISTA_RECHAZO:-0}/rechazar" '{"motivo":"No pudimos verificar el refugio"}'
+esperar "La veterinaria la rechaza con el motivo" 200 '"motivo_rechazo":"No pudimos verificar el refugio"'
+pedir GET '/api/rescatistas?estado=RECHAZADO&buscar=dudoso'
+esperar "Queda en los rechazados, con el motivo" 200 '"motivo_rechazo":"No pudimos verificar el refugio"'
+esperar "  y la fecha y hora" 200 '"validado_en":"20'
+pedir GET "/api/rescatistas/${RESCATISTA_RECHAZO:-0}"
+esperar "Y en su perfil" 200 '"estado_validacion":"RECHAZADO"'
+SESION_VET=$SESION
+SESION=$SESION_RECHAZO
+pedir GET /api/notificaciones
+esperar "A la rescatista le llega el aviso con el motivo" 200 'Motivo: No pudimos verificar el refugio.'
+pedir GET /api/rescatistas/104
+esperar "Una rescatista no ve perfiles de rescatistas (403)" 403
+SESION=$SESION_VET
 
 SESION=$SESION_RESCATISTA2
 CSRF=$CSRF_RESCATISTA2
@@ -142,6 +185,17 @@ pedir POST /api/adopciones/publicaciones/102/rechazar '{"motivo":""}'
 esperar "Rechazar sin motivo da 400" 400 '"motivo"'
 pedir POST /api/adopciones/publicaciones/102/rechazar '{"motivo":"La foto no se ve bien"}'
 esperar "La veterinaria rechaza la publicación de Rocco" 200 '"motivo_rechazo":"La foto no se ve bien"'
+pedir GET '/api/adopciones/rechazos?buscar=rocco'
+esperar "El rechazo queda en el historial, con el motivo" 200 '"motivo":"La foto no se ve bien"'
+esperar "  y la veterinaria que lo hizo" 200 '"veterinaria":"Dra. Laura Mart'
+pedir GET '/api/adopciones/rechazos?rescatista_id=104&desde=2026-13-01'
+esperar "Una fecha inválida en el historial da 400" 400 '"desde"'
+pedir GET '/api/adopciones/moderacion?estado=APROBADA&buscar=pipa'
+esperar "La veterinaria ve las publicaciones aprobadas, con la fecha" 200 '"aprobada_en":"20'
+pedir GET '/api/adopciones/moderacion?estado=TODAS&rescatista_id=104'
+esperar "Y todas las de una rescatista (su perfil), también la rechazada" 200 '"estado_moderacion":"RECHAZADA"'
+pedir GET '/api/adopciones/moderacion?estado=OTRO'
+esperar "Un estado que no existe da 400" 400 '"estado"'
 pedir POST "/api/adopciones/publicaciones/${PUBLICACION_CANELA:-0}/aprobar"
 esperar "La veterinaria aprueba la de Canela: se abre la adopción" 200 '"estado":"PUBLICADA"'
 ADOPCION_CANELA=$(printf '%s' "$RESPUESTA" | grep -o '"adopcion":{"id":[0-9]*' | grep -o '[0-9]*$')
@@ -298,6 +352,18 @@ esperar "Editar con un título muy corto da 400" 400 '"titulo"'
 pedir PUT /api/adopciones/publicaciones/102 "{\"descripcion\":\"Perro de 2 a\u00f1os, tranquilo. Ahora con una foto mejor.\",\"foto\":\"$PNG_PRUEBA\"}"
 esperar "La rescatista edita la publicación rechazada de Rocco: vuelve a revisión" 200 '"estado_moderacion":"PENDIENTE"'
 esperar "Y se borra el motivo del rechazo" 200 '"motivo_rechazo":null'
+pedir GET /api/adopciones/rechazos
+esperar "La rescatista no ve el historial de rechazos (403)" 403
+SESION_RESCATISTA=$SESION
+CSRF_RESCATISTA=$CSRF
+iniciar_sesion vet@prueba.huellavet 'Vet-Prueba-2026'
+pedir GET '/api/adopciones/rechazos?buscar=rocco'
+esperar "Pero el rechazo sigue en el historial de la veterinaria" 200 '"motivo":"La foto no se ve bien"'
+esperar "  diciendo que ahora está otra vez por revisar" 200 '"estado_moderacion":"PENDIENTE"'
+pedir GET /api/adopciones/moderacion
+esperar "Y en Por revisar dice que ya se rechazó una vez" 200 '"veces_rechazada":1'
+SESION=$SESION_RESCATISTA
+CSRF=$CSRF_RESCATISTA
 pedir PUT "/api/adopciones/publicaciones/${PUBLICACION_CANELA:-0}" '{"titulo":"Canela"}'
 esperar "Una publicación cerrada no se edita (409)" 409
 
