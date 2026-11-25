@@ -1,8 +1,11 @@
-# Tareas cada 15 minutos, en dev y en producción:
+# Tareas cada 5 minutos (el mínimo de GitHub; 25/11, antes 15), en dev y en producción:
 #
 # 1. POST /api/notificaciones/tareas/enviar (Backend): manda por WhatsApp los avisos pendientes.
 # 2. POST /api/tienda/tareas/vencer (Inventario): cancela las compras vencidas, manda los recordatorios
 #    de retiro y los avisos de cancelación, y reintenta los reintegros de Mercado Pago que fallaron.
+#
+# Los WhatsApp de turnos, postulaciones, compras y cuenta ya salen en el momento (Backend, envío
+# inmediato); esta tarea manda los del motor diario y reintenta los que fallaron.
 #
 # Las dos usan el header X-Tarea-Token: en producción el secret TAREAS_TOKEN y en dev TAREAS_TOKEN_DEV
 # (si no existe, TAREAS_TOKEN). También se puede correr a mano desde Actions ("Run workflow").
@@ -11,7 +14,7 @@ name: Enviar avisos
 
 on:
   schedule:
-    - cron: "*/15 * * * *"
+    - cron: "*/5 * * * *"
   workflow_dispatch:
     inputs:
       entorno:
