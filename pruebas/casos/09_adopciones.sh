@@ -338,13 +338,23 @@ esperar "Pero ve el detalle de su adopción" 200 '"estado":"FINALIZADA"'
 pedir GET /api/notificaciones
 esperar "A la rescatista le llegó el aviso del turno del chequeo" 200 'tiene turno para el chequeo de adopción de Pipa'
 
-# --- Cancelar ---
+# --- Dar de baja con postulantes (24/11: no hay más "cancelar"; la baja es la única forma) ---
 pedir POST "/api/adopciones/${ADOPCION_CANELA:-0}/cancelar"
-esperar "La rescatista cancela la adopción de Canela" 200 '"estado":"CANCELADA"'
-pedir POST "/api/adopciones/${ADOPCION_CANELA:-0}/cancelar"
-esperar "Una adopción terminada no se cancela (409)" 409
+esperar "Cancelar una adopción ya no existe (404)" 404
+iniciar_sesion cliente@prueba.huellavet 'Cliente-Prueba-2026'
+pedir POST "/api/adopciones/${ADOPCION_CANELA:-0}/postulaciones" "$POSTULACION"
+esperar "El cliente 102 se postula a Canela" 201 '"estado":"PENDIENTE"'
+iniciar_sesion rescatista@prueba.huellavet 'Rescatista-Prueba-2026'
+pedir DELETE "/api/adopciones/publicaciones/${PUBLICACION_CANELA:-0}"
+esperar "La rescatista da de baja la publicación de Canela, que tenía un postulante" 204
+pedir GET "/api/adopciones/${ADOPCION_CANELA:-0}/postulaciones"
+esperar "  su adopción queda cancelada" 200 '"estado":"CANCELADA"'
 pedir GET /api/pacientes/mascotas/901
-esperar "Canela sigue a cargo de la rescatista" 200 '"nombre":"Canela"'
+esperar "  y Canela sigue a cargo de la rescatista" 200 '"nombre":"Canela"'
+iniciar_sesion cliente@prueba.huellavet 'Cliente-Prueba-2026'
+pedir GET /api/notificaciones
+esperar "Al postulante le llega el aviso de la baja" 200 'La publicación de Canela se dio de baja'
+iniciar_sesion rescatista@prueba.huellavet 'Rescatista-Prueba-2026'
 
 # --- Editar y dar de baja publicaciones ---
 pedir PUT /api/adopciones/publicaciones/102 '{"titulo":"ab"}'
@@ -368,7 +378,7 @@ pedir PUT "/api/adopciones/publicaciones/${PUBLICACION_CANELA:-0}" '{"titulo":"C
 esperar "Una publicación cerrada no se edita (409)" 409
 
 pedir POST /api/adopciones/publicaciones "$CANELA"
-esperar "Canela se puede volver a publicar después de cancelar" 201
+esperar "Canela se puede volver a publicar después de darla de baja" 201
 PUBLICACION_CANELA2=$(primer_id)
 
 iniciar_sesion rescatista2@prueba.huellavet 'Rescatista-Prueba-2026'
@@ -384,11 +394,47 @@ ADOPCION_CANELA2=$(printf '%s' "$RESPUESTA" | grep -o '"adopcion":{"id":[0-9]*' 
 pedir DELETE /api/adopciones/publicaciones/102
 esperar "La veterinaria no da de baja publicaciones (403)" 403
 
+# --- Dar de baja con adoptante elegido y el chequeo programado ---
+iniciar_sesion cliente2@prueba.huellavet 'Cliente-Prueba-2026'
+pedir POST "/api/adopciones/${ADOPCION_CANELA2:-0}/postulaciones" "$POSTULACION"
+esperar "El cliente 103 se postula a la nueva publicación de Canela" 201
+POSTULACION_CANELA2=$(primer_id)
+iniciar_sesion rescatista@prueba.huellavet 'Rescatista-Prueba-2026'
+pedir POST "/api/adopciones/${ADOPCION_CANELA2:-0}/elegir" "{\"postulacion_id\":${POSTULACION_CANELA2:-0}}"
+esperar "La rescatista lo elige" 200 '"estado":"ADOPTANTE_ELEGIDO"'
+iniciar_sesion vet@prueba.huellavet 'Vet-Prueba-2026'
+for HORA in 18:10 18:00 17:50 17:40 17:30 17:20 17:10 17:00 16:50 16:40; do
+  pedir POST /api/pacientes/turnos "{\"mascota_id\":901,\"fecha\":\"$HOY\",\"hora\":\"$HORA\",\"motivo\":\"CHEQUEO_ADOPCION\"}"
+  [ "$CODIGO" = 201 ] && break
+done
+esperar "La veterinaria carga el turno de chequeo de Canela" 201 '"CHEQUEO_ADOPCION"'
+TURNO_CANELA=$(primer_id)
+pedir POST "/api/adopciones/${ADOPCION_CANELA2:-0}/chequeo" "{\"turno_id\":${TURNO_CANELA:-0}}"
+esperar "  y lo asocia a la adopción" 200 '"estado":"CHEQUEO_PENDIENTE"'
+
 iniciar_sesion rescatista@prueba.huellavet 'Rescatista-Prueba-2026'
 pedir DELETE "/api/adopciones/publicaciones/${PUBLICACION_CANELA2:-0}"
-esperar "La rescatista da de baja la publicación de Canela" 204
+esperar "La rescatista da de baja la publicación de Canela con el chequeo programado" 204
 pedir GET "/api/adopciones/${ADOPCION_CANELA2:-0}/postulaciones"
-esperar "Y su adopción queda cancelada" 200 '"estado":"CANCELADA"'
+esperar "  su adopción queda cancelada" 200 '"estado":"CANCELADA"'
+iniciar_sesion vet@prueba.huellavet 'Vet-Prueba-2026'
+pedir POST "/api/pacientes/turnos/${TURNO_CANELA:-0}/cancelar"
+esperar "El turno del chequeo se canceló solo (ya no se puede cancelar: 409)" 409
+pedir GET /api/notificaciones
+esperar "A la veterinaria le llega el aviso, con el turno cancelado" 200 'dio de baja la publicación de Canela: la adopción con Tomás Aguirre no sigue. Se canceló el turno del chequeo'
+iniciar_sesion cliente2@prueba.huellavet 'Cliente-Prueba-2026'
+pedir GET /api/notificaciones
+esperar "Y al adoptante, que se canceló su turno" 200 'la adopción no sigue. Se canceló tu turno del chequeo'
+pedir GET /api/adopciones/mis-postulaciones
+esperar "  y su postulación queda cerrada" 200 '"estado":"RECHAZADA"'
+
+# Cancelar el turno del chequeo es de proceso a proceso: desde afuera está bloqueado.
+CODIGO=$(curl --silent --max-time 60 -o /dev/null -w '%{http_code}' -X POST \
+  -H 'X-Servicio-Token: cualquiera' "$BASE_URL/internal/turnos/${TURNO_CANELA:-0}/cancelar-chequeo")
+RESPUESTA=""
+esperar "Cancelar el turno del chequeo no se puede llamar desde afuera (404)" 404
+
+iniciar_sesion rescatista@prueba.huellavet 'Rescatista-Prueba-2026'
 pedir DELETE "/api/adopciones/publicaciones/${PUBLICACION_CANELA2:-0}"
 esperar "No se da de baja dos veces (409)" 409
 pedir DELETE /api/adopciones/publicaciones/102
