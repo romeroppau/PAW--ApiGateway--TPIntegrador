@@ -66,6 +66,11 @@ DELETE a FROM adopcion a
   JOIN publicacion pu ON pu.id = a.publicacion_id
 WHERE pu.mascota_id IN (901, 902, 903, 904) AND a.id NOT IN (101, 103);
 
+-- El historial de rechazos (migración 023) de estas mascotas: se vuelve a cargar abajo.
+DELETE pr FROM publicacion_rechazo pr
+  JOIN publicacion pu ON pu.id = pr.publicacion_id
+WHERE pu.mascota_id IN (901, 902, 903, 904);
+
 DELETE FROM publicacion
 WHERE mascota_id IN (901, 902, 903, 904) AND id NOT IN (101, 102, 103);
 
@@ -93,6 +98,10 @@ ON DUPLICATE KEY UPDATE
   motivo_rechazo = VALUES(motivo_rechazo),
   activa = VALUES(activa),
   creada_en = VALUES(creada_en);
+
+-- La de Pipa se rechazó una vez antes de aprobarse (la rescatista cambió la foto): queda en el historial.
+INSERT INTO publicacion_rechazo (id, publicacion_id, motivo, rechazada_en, rechazada_por) VALUES
+  (101, 101, 'La foto está muy oscura: subí una con más luz.', @ahora - INTERVAL 6 DAY + INTERVAL 3 HOUR, 101);
 
 -- 101: Pipa, con una postulación pendiente del cliente 102 (el cliente 103 todavía puede postularse).
 -- 103: Simba, finalizada hace exactamente 30 días: el motor tiene que mandar el control de los 30 días.

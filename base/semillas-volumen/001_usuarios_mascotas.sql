@@ -61,6 +61,10 @@ ON DUPLICATE KEY UPDATE
   nombre = VALUES(nombre), password_hash = VALUES(password_hash), telefono = VALUES(telefono), rol = VALUES(rol),
   organizacion = VALUES(organizacion), estado_validacion = VALUES(estado_validacion),
   intentos_fallidos = 0, primer_fallo_en = NULL, bloqueado_hasta = NULL;
+-- Cuándo los aprobó la veterinaria (migración 022): hace entre 6 meses y 8 meses.
+UPDATE usuario SET validado_en = UTC_TIMESTAMP() - INTERVAL 3 HOUR - INTERVAL (180 + (id - 2042) * 15) DAY,
+                   validado_por = 101, motivo_rechazo = NULL
+WHERE id BETWEEN 2042 AND 2046;
 
 -- Mascotas de los clientes (dos cada uno) y dos más del cliente de prueba 102.
 INSERT INTO mascota

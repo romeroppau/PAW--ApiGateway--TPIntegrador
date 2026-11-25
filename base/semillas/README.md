@@ -108,14 +108,14 @@ lo vuelven a dejar las semillas de productos e insumos.
 
 ## Adopciones
 
-La rescatista 104 (`rescatista@`, aprobada) tiene tres mascotas a su cargo; la 105 (`rescatista2@`,
+La rescatista 104 (`rescatista@`, aprobada hace un mes: `validado_en`, migración 022) tiene tres mascotas a su cargo; la 105 (`rescatista2@`,
 pendiente) no tiene ninguna y no puede publicar. Las mascotas y el turno usan **ids desde 901**,
 porque en dev los ids 105 en adelante ya los usan las mascotas y los turnos que crea el humo.
 
 | Mascota | Dueño | Publicación | Adopción | Para qué |
 |---|---|---|---|---|
 | 901 Canela (perra, 1 año) | 104 (rescatista) | — | — | Publicar |
-| 902 Pipa (gata, 6 meses) | 104 (rescatista) | 101, aprobada | 101, con postulantes: la postulación 101 del cliente 102, pendiente | Postularse (el cliente 103), elegir, chequeo y completar |
+| 902 Pipa (gata, 6 meses) | 104 (rescatista) | 101, aprobada (antes se rechazó una vez: queda en el historial de rechazos) | 101, con postulantes: la postulación 101 del cliente 102, pendiente | Postularse (el cliente 103), elegir, chequeo y completar |
 | 903 Rocco (perro, 2 años) | 104 (rescatista) | 102, pendiente de moderación | — | Aprobar o rechazar la publicación |
 | 904 Simba (gato, 1 año) | 103 (`cliente2@`) | 103, dada de baja | 103, finalizada **hace 30 días** (chequeo: turno 901, atendido) | El motor manda el control de los 30 días |
 

@@ -12,7 +12,7 @@ veterinaria funcionando y para mostrar los flujos en la demo. No usa las cuentas
 | 002 | 30 productos con marca, precio y foto (6 por vencer, 6 con stock bajo) y 15 insumos; da de baja los productos e insumos que había antes (no los borra) | 3001 a 3030 |
 | 003 | 6 meses de agenda con la veterinaria de la demo (~720 turnos), consultas con diagnóstico, indicaciones, lo que se usó y factura; calendario sanitario | turnos 30001 a 30765 |
 | 004 | Fotos de las mascotas (14 de perro y 12 de gato, Unsplash) | — |
-| 005 | 44 adopciones en todos los estados; 4 son del rescatista de la demo | 30001 a 30044 |
+| 005 | 44 adopciones en todos los estados; 4 son del rescatista de la demo. Las 2 rechazadas, también en el historial de rechazos (migración 023) | 30001 a 30044 |
 | 006 | 150 compras de la tienda (19 del cliente 1; la V-030002 está pagada y para retirar) | 30001 a 30150 |
 | 007 | 120 avisos de la campana para la veterinaria, el cliente 1 y el rescatista | 30001 a 30120 |
 | 008 | 22 reseñas, la mitad respondidas | 30001 a 30022 |
