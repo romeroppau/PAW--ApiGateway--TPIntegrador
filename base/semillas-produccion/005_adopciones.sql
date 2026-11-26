@@ -14,7 +14,9 @@
 --   i 41 a 44   las del rescatista de la demo: 41 esperando la moderación, 42 con postulantes, 43
 --               publicada sin postulantes (para que el cliente 2 se postule en la demo), 44 finalizada.
 --   Turnos de chequeo: 30801 a 30844 (19:10 o 19:40; si ese horario ya está ocupado por un turno
---   cargado a mano, el chequeo queda cancelado y no lo pisa). Postulaciones: 30000 + i * 10 + k.
+--   cargado a mano, el chequeo queda cancelado y no lo pisa; nunca un domingo). Cada chequeo atendido
+--   tiene su consulta y su factura (C-0308.., mismo id que el turno): la mascota adoptada lo tiene en
+--   su historial. Postulaciones: 30000 + i * 10 + k.
 -- Correr de nuevo deja todo como estaba, con las fechas corridas a hoy.
 
 SET @hoy = DATE(UTC_TIMESTAMP() - INTERVAL 3 HOUR);
@@ -26,6 +28,7 @@ DELETE i FROM item_insumo_consulta i JOIN consulta c ON c.id = i.consulta_id WHE
 DELETE i FROM item_producto_consulta i JOIN consulta c ON c.id = i.consulta_id WHERE c.turno_id BETWEEN 30801 AND 30844;
 UPDATE evento_sanitario e JOIN consulta c ON c.id = e.consulta_id
   SET e.consulta_id = NULL, e.fecha_aplicada = NULL WHERE c.turno_id BETWEEN 30801 AND 30844;
+DELETE FROM turno_motivo WHERE turno_id BETWEEN 30801 AND 30844;
 DELETE FROM consulta WHERE turno_id BETWEEN 30801 AND 30844;
 UPDATE turno SET estado = 'CANCELADO'
   WHERE mascota_id BETWEEN 30101 AND 30144 AND motivo = 'CHEQUEO_ADOPCION'
@@ -102,9 +105,14 @@ SELECT 30800 + c.i, 30100 + c.i, @vet,
           'CANCELADO', IF(c.estado = 'FINALIZADA', 'ATENDIDO', 'PROGRAMADO')),
        15000.00, NULL, NULL
 FROM (
+  -- El día anterior a terminar (o, si es domingo, el sábado); los pendientes, en los próximos días
+  -- (o, si es domingo, el lunes).
   SELECT i, estado,
-         IF(estado = 'FINALIZADA', DATE(@hoy - INTERVAL dias_fin DAY) - INTERVAL 1 DAY, @hoy + INTERVAL (i - 21) DAY) AS fecha,
-         IF(estado = 'FINALIZADA' AND i % 2 = 0, '19:10:00', '19:40:00') AS hora
+         IF(estado = 'FINALIZADA',
+            DATE(@hoy - INTERVAL dias_fin DAY) - INTERVAL IF(DAYOFWEEK(DATE(@hoy - INTERVAL dias_fin DAY) - INTERVAL 1 DAY) = 1, 2, 1) DAY,
+            @hoy + INTERVAL (i - 21 + IF(DAYOFWEEK(@hoy + INTERVAL (i - 21) DAY) = 1, 1, 0)) DAY) AS fecha,
+         -- Los pendientes, en horarios distintos entre sí (aunque uno se corra por el domingo).
+         IF(estado = 'FINALIZADA', IF(i % 2 = 0, '19:10:00', '19:40:00'), IF(i = 24, '19:35:00', '19:05:00')) AS hora
   FROM prod_adopcion
   WHERE estado IN ('CHEQUEO_PENDIENTE', 'FINALIZADA')
 ) c
@@ -126,8 +134,7 @@ SELECT 30000 + v.i, v.rescatista, 30100 + v.i,
          '. ',
          ELT(1 + (v.i % 4), 'Lo rescatamos de la calle en el barrio Ameghino.', 'Llegó al refugio después de un abandono.',
              'Lo encontramos junto a la ruta 5 y se recuperó muy bien.', 'Vivía en una obra en construcción.'),
-         ' Tiene las vacunas al día', IF(v.i % 3 = 0, ', está castrado', ''),
-         ' y se entrega con seguimiento. ',
+         ' Se entrega con seguimiento del refugio. ',
          IF(m.especie = 'GATO', 'Usa el arenero sin problemas.', 'Sabe caminar con correa.')),
        m.foto, m.foto_tipo,
        v.moderacion,
@@ -180,5 +187,32 @@ SELECT 30000 + v.i * 10 + k.k, 30000 + v.i,
 FROM prod_adopcion v CROSS JOIN k
 WHERE (v.estado = 'CON_POSTULANTES' AND (k.k <= 1 + (v.i % 3) OR (k.k = 3 AND v.i IN (5, 6))))
    OR (v.estado IN ('ADOPTANTE_ELEGIDO', 'CHEQUEO_PENDIENTE', 'FINALIZADA') AND k.k <= 2);
+
+-- 8. El chequeo de cada adopción (migración 026: su motivo) y, si se atendió, su consulta y su
+--    factura (mismo id que el turno): queda en el historial de la mascota, que ya es del adoptante.
+INSERT INTO turno_motivo (turno_id, motivo, evento_sanitario_id)
+SELECT t.id, 'CHEQUEO_ADOPCION', NULL FROM turno t WHERE t.id BETWEEN 30801 AND 30844;
+
+INSERT INTO consulta (id, turno_id, diagnostico, observaciones, valor_base, estado, finalizada_en)
+SELECT t.id, t.id,
+       ELT(1 + t.id % 3, 'Chequeo de adopción: buen estado general, apto para la adopción.',
+           'Chequeo de adopción: sano, peso adecuado. Se adapta bien a su nueva casa.',
+           'Chequeo de adopción: buen estado general; leve sarro, a controlar en un año.'),
+       'Se recomienda cargar su calendario de vacunas en la próxima consulta.',
+       t.precio_consulta, 'FINALIZADA', TIMESTAMP(t.fecha, t.hora) + INTERVAL 25 MINUTE
+FROM turno t WHERE t.id BETWEEN 30801 AND 30844 AND t.estado = 'ATENDIDO';
+
+INSERT INTO item_insumo_consulta (consulta_id, insumo_id, cantidad, costo_unitario)
+SELECT c.id, i.id, 1, i.costo FROM consulta c JOIN insumo i ON i.id = 3004 WHERE c.id BETWEEN 30801 AND 30844;
+
+INSERT INTO factura_consulta
+  (id, numero, consulta_id, subtotal_base, subtotal_insumos, subtotal_productos, total, huellitas_usadas, estado, fecha)
+SELECT c.id, CONCAT('C-', LPAD(c.id, 6, '0')), c.id, c.valor_base, i.costo_unitario, 0, c.valor_base + i.costo_unitario, NULL,
+       IF(c.finalizada_en < @hoy - INTERVAL 7 DAY, 'PAGADA', 'PENDIENTE_PAGO'), c.finalizada_en
+FROM consulta c JOIN item_insumo_consulta i ON i.consulta_id = c.id
+WHERE c.id BETWEEN 30801 AND 30844
+ON DUPLICATE KEY UPDATE numero = VALUES(numero), consulta_id = VALUES(consulta_id), subtotal_base = VALUES(subtotal_base),
+  subtotal_insumos = VALUES(subtotal_insumos), subtotal_productos = 0, total = VALUES(total), estado = VALUES(estado),
+  fecha = VALUES(fecha);
 
 DROP TEMPORARY TABLE IF EXISTS prod_adopcion;

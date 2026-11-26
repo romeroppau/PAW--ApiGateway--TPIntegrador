@@ -14,6 +14,10 @@ es_entorno_de_prueba || return 0
 HOY_CAL=$(date -u -d '-3 hours' +%Y-%m-%d)
 MANIANA_CAL=$(date -u -d '-3 hours +1 day' +%Y-%m-%d)
 AYER_CAL=$(date -u -d '-3 hours -1 day' +%Y-%m-%d)
+# 26/11: entre dos dosis de la misma vacuna tienen que pasar los días mínimos de Configuración → Vacunas
+# (21 entre dosis, por defecto): la 1.ª se marca como dada hace 30 días y el refuerzo va en un año.
+HACE_30_CAL=$(date -u -d '-3 hours -30 day' +%Y-%m-%d)
+EN_UN_ANIO_CAL=$(date -u -d '-3 hours +1 year' +%Y-%m-%d)
 CAL=/api/pacientes/mascotas/102/calendario-sanitario
 # El id del evento sin dar con ese nombre, en el calendario de la última respuesta.
 evento_sin_dar() {
@@ -63,8 +67,8 @@ esperar "Una fecha pasada da 400" 400 '"fecha_programada"'
 
 pedir POST "$CAL/${DOSIS1:-0}/dada" "{\"fecha_aplicada\":\"$MANIANA_CAL\"}"
 esperar "Marcar como dada con una fecha futura da 400" 400 'no puede ser posterior a hoy'
-pedir POST "$CAL/${DOSIS1:-0}/dada" "{\"fecha_aplicada\":\"$HOY_CAL\"}"
-esperar "La 1.ª se marca como dada a mano (se la dieron en otra veterinaria)" 200 '"en_consulta":false'
+pedir POST "$CAL/${DOSIS1:-0}/dada" "{\"fecha_aplicada\":\"$HACE_30_CAL\"}"
+esperar "La 1.ª se marca como dada a mano (se la dieron en otra veterinaria, hace 30 días)" 200 '"en_consulta":false'
 pedir POST "$CAL" "{\"plan_sanitario_id\":15,\"fecha_programada\":\"$MANIANA_CAL\"}"
 esperar "Con la 1.ª dada, ahora sí se carga la 2.ª" 200 '"nombre":"Leucemia felina (2.ª dosis)","plan_sanitario_id":15'
 DOSIS2=$(evento_sin_dar 'Leucemia felina (2.ª dosis)')
@@ -109,25 +113,26 @@ pedir POST "/api/pacientes/consultas/${CONSULTA_LEU:-0}/insumos" '{"insumo_id":1
 esperar "Se carga la triple felina" 201 '"aplicacion":"TRIPLE_FELINA"'
 pedir POST "/api/pacientes/consultas/${CONSULTA_LEU:-0}/finalizar"
 esperar "Sin stock tampoco se finaliza" 409 'Stock insuficiente'
-pedir POST /api/inventario/insumos/191/stock '{"cantidad":3}'
+pedir POST /api/inventario/insumos/191/stock "{\"cantidad\":3,\"lote\":{\"vencimiento\":\"$(date -u -d '-3 hours +200 day' +%Y-%m-%d)\"}}"
 esperar "Se carga stock de la vacuna (desde la consulta)" 200 '"stock":3'
 pedir POST "/api/pacientes/consultas/${CONSULTA_LEU:-0}/finalizar"
 esperar "Ahora sí se finaliza" 200 '"numero":"C-'
 pedir GET "$CAL"
 esperar "La 2.ª dosis queda dada en esa consulta" 200 "\"id\":${DOSIS2:-0},\"tipo\":\"VACUNA\",\"nombre\":\"Leucemia felina (2.ª dosis)\",\"plan_sanitario_id\":15,\"aplicacion\":\"LEUCEMIA_FELINA\",\"fecha_programada\":\"$MANIANA_CAL\",\"fecha_aplicada\":\"$HOY_CAL\",\"en_consulta\":true"
-esperar "  y la triple felina también, con su próximo refuerzo agregado" 200 "\"id\":${TRIPLE:-0},\"tipo\":\"VACUNA\",\"nombre\":\"Triple felina (refuerzo anual)\",\"plan_sanitario_id\":11,\"aplicacion\":\"TRIPLE_FELINA\",\"fecha_programada\":\""
+esperar "  y la triple felina también" 200 "\"id\":${TRIPLE:-0},\"tipo\":\"VACUNA\",\"nombre\":\"Triple felina (refuerzo anual)\",\"plan_sanitario_id\":11,\"aplicacion\":\"TRIPLE_FELINA\",\"fecha_programada\":\""
+esperar "  con el próximo refuerzo sugerido en un año (ya no se agrega solo, 26/11)" 200 "\"proxima_sugerida\":\"$EN_UN_ANIO_CAL\""
 pedir GET /api/inventario/insumos/191
 esperar "  y se descontó la dosis" 200 '"stock":2'
 pedir GET "/api/pacientes/mascotas/102/historial"
 esperar "El historial trae los motivos de la consulta" 200 '{"motivo":"CONTROL","evento_sanitario":null}'
 
 # --- Quitar del calendario ---
-pedir POST "$CAL" "{\"plan_sanitario_id\":16,\"fecha_programada\":\"$MANIANA_CAL\"}"
+pedir POST "$CAL" "{\"plan_sanitario_id\":16,\"fecha_programada\":\"$EN_UN_ANIO_CAL\"}"
 esperar "Se agrega el refuerzo anual" 200 '"nombre":"Leucemia felina (refuerzo anual)"'
 REFUERZO=$(evento_sin_dar 'Leucemia felina (refuerzo anual)')
 pedir DELETE "$CAL/${REFUERZO:-0}"
 esperar "  y se quita" 200 '"eventos":['
-pedir POST "$CAL" "{\"plan_sanitario_id\":16,\"fecha_programada\":\"$MANIANA_CAL\"}"
+pedir POST "$CAL" "{\"plan_sanitario_id\":16,\"fecha_programada\":\"$EN_UN_ANIO_CAL\"}"
 esperar "  (ya no estaba: se puede volver a agregar)" 200 '"nombre":"Leucemia felina (refuerzo anual)"'
 pedir DELETE "$CAL/999999999"
 esperar "Quitar un evento que no es de la mascota da 404" 404

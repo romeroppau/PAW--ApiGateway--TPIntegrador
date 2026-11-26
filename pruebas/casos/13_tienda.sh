@@ -73,7 +73,7 @@ cerrar_sesion
 
 # --- Retiro manual de stock de un producto (25/11), como en insumos ---
 iniciar_sesion vet@prueba.huellavet 'Vet-Prueba-2026'
-pedir POST /api/inventario/productos '{"nombre":"Producto para retirar stock","categoria":"ACCESORIO","especie":"TODAS","precio":100,"stock":5}'
+pedir POST /api/inventario/productos '{"nombre":"Producto para retirar stock","categoria":"ACCESORIO","especie":"TODAS","precio":100,"stock":5,"vence":false}'
 RETIRO=$(printf '%s' "$RESPUESTA" | grep -o '"id":[0-9]*' | head -1 | cut -d: -f2)
 pedir POST "/api/inventario/productos/$RETIRO/retiro" '{"cantidad":0}'
 esperar "Retirar una cantidad inválida da 400" 400 '"cantidad"'
@@ -96,7 +96,7 @@ cerrar_sesion
 
 # --- Un producto dado de baja no se puede agregar ---
 iniciar_sesion vet@prueba.huellavet 'Vet-Prueba-2026'
-pedir POST /api/inventario/productos '{"nombre":"Producto que se da de baja","categoria":"ACCESORIO","especie":"TODAS","precio":100,"stock":5}'
+pedir POST /api/inventario/productos '{"nombre":"Producto que se da de baja","categoria":"ACCESORIO","especie":"TODAS","precio":100,"stock":5,"vence":false}'
 BAJA=$(printf '%s' "$RESPUESTA" | grep -o '"id":[0-9]*' | head -1 | cut -d: -f2)
 pedir DELETE "/api/inventario/productos/$BAJA"
 cerrar_sesion
