@@ -8,8 +8,10 @@
 --   motivo: por el comprador (pagada, con el reintegro del 75 % ya devuelto), sin pago o vencida (no
 --   la retiró: sin reintegro); el resto ENTREGADA por la veterinaria, 1 o 2 días después.
 --   De 1 a 2 productos de 002 por compra, al precio de hoy. La política de reintegro es la de
---   siempre (75 % / 50 % / 48 horas). No mueven el stock (lo deja 002) pero sí dejan el movimiento de
---   venta, para los reportes.
+--   siempre (75 % / 50 % / 48 horas). Cada compra tiene su plazo para pagar (15 minutos) y para retirar
+--   (el 5.º día hábil), como las de verdad: las pagadas para retirar dicen hasta cuándo.
+--   Movimientos: la venta de cada producto (se reservó al confirmar) y, si se canceló, la devolución
+--   (VENTA_CANCELADA). No cambian el stock: 010_movimientos.sql cierra las cuentas con el de 002.
 -- Correr de nuevo deja todo como estaba, con las fechas corridas a hoy.
 
 SET @ahora = UTC_TIMESTAMP() - INTERVAL 3 HOUR;
@@ -65,14 +67,16 @@ SELECT 30000 + i, producto2, 1, precio2 FROM prod_compra WHERE producto2 IS NOT 
 -- Las facturas. Primero los pagos de la carga anterior, que apuntan a ellas.
 DELETE FROM pago WHERE factura_compra_id BETWEEN 30001 AND 30150;
 INSERT INTO factura_compra
-  (id, numero, carrito_id, total, estado, motivo_cancelacion, cancelada_en, fecha, entregada_en, entregada_por,
-   reintegro_anticipado, reintegro_ultimo_momento, reintegro_horas,
+  (id, numero, carrito_id, total, estado, motivo_cancelacion, cancelada_en, fecha, pagar_antes_de, retirar_hasta,
+   entregada_en, entregada_por, reintegro_anticipado, reintegro_ultimo_momento, reintegro_horas,
    reintegro_porcentaje, reintegro_monto, reintegro_estado)
 SELECT 30000 + i, CONCAT('V-', LPAD(30000 + i, 6, '0')), 30000 + i,
        precio * cantidad + COALESCE(precio2, 0), estado, motivo,
        CASE motivo WHEN 'SIN_PAGO' THEN fecha + INTERVAL 15 MINUTE WHEN 'COMPRADOR' THEN fecha + INTERVAL 1 DAY
                    WHEN 'VENCIDA' THEN fecha + INTERVAL 8 DAY ELSE NULL END,
-       fecha,
+       fecha, fecha + INTERVAL 15 MINUTE,
+       -- Sin pagar no llegó a tener plazo de retiro (migración 015: el 5.º día hábil).
+       IF(motivo = 'SIN_PAGO', NULL, DATE(fecha) + INTERVAL (CASE WEEKDAY(fecha) WHEN 5 THEN 6 WHEN 6 THEN 5 ELSE 7 END) DAY),
        IF(estado = 'ENTREGADA', fecha + INTERVAL (1 + i % 2) DAY + INTERVAL 2 HOUR, NULL),
        IF(estado = 'ENTREGADA', @vet, NULL),
        75, 50, 48,
@@ -84,7 +88,7 @@ ON DUPLICATE KEY UPDATE
   numero = VALUES(numero), carrito_id = VALUES(carrito_id), total = VALUES(total), estado = VALUES(estado),
   motivo_cancelacion = VALUES(motivo_cancelacion), cancelada_en = VALUES(cancelada_en), fecha = VALUES(fecha),
   entregada_en = VALUES(entregada_en), entregada_por = VALUES(entregada_por),
-  pagar_antes_de = NULL, retirar_hasta = NULL,
+  pagar_antes_de = VALUES(pagar_antes_de), retirar_hasta = VALUES(retirar_hasta),
   reintegro_anticipado = VALUES(reintegro_anticipado), reintegro_ultimo_momento = VALUES(reintegro_ultimo_momento),
   reintegro_horas = VALUES(reintegro_horas), reintegro_porcentaje = VALUES(reintegro_porcentaje),
   reintegro_monto = VALUES(reintegro_monto), reintegro_estado = VALUES(reintegro_estado);
@@ -96,18 +100,30 @@ SELECT 30000 + i, 30000 + i, precio * cantidad + COALESCE(precio2, 0), CONCAT('p
 FROM prod_compra
 WHERE motivo IS NULL OR motivo <> 'SIN_PAGO';
 
--- El movimiento de venta de cada producto (id_operacion fijo: una recarga solo le corre la fecha).
+-- Los movimientos (id_operacion fijo: una recarga solo les corre la fecha). Primero los de la carga
+-- anterior, por si una compra cambió de productos.
+DELETE FROM movimiento_inventario WHERE id_operacion LIKE 'prod-venta-V-0%' OR id_operacion LIKE 'prod-cancela-V-0%';
+-- La venta de cada producto: al confirmar se reserva el stock (también en las que después no se pagaron).
 INSERT INTO movimiento_inventario (producto_id, insumo_id, tipo, cantidad, motivo, usuario_id, id_operacion, fecha)
 SELECT producto, NULL, 'SALIDA', cantidad, 'VENTA', cliente,
        CONCAT('prod-venta-V-', LPAD(30000 + i, 6, '0'), '-', producto), fecha
-FROM prod_compra
-WHERE motivo IS NULL OR motivo <> 'SIN_PAGO'
-ON DUPLICATE KEY UPDATE producto_id = VALUES(producto_id), cantidad = VALUES(cantidad), usuario_id = VALUES(usuario_id), fecha = VALUES(fecha);
+FROM prod_compra;
 INSERT INTO movimiento_inventario (producto_id, insumo_id, tipo, cantidad, motivo, usuario_id, id_operacion, fecha)
 SELECT producto2, NULL, 'SALIDA', 1, 'VENTA', cliente,
        CONCAT('prod-venta-V-', LPAD(30000 + i, 6, '0'), '-', producto2), fecha
 FROM prod_compra
-WHERE producto2 IS NOT NULL AND (motivo IS NULL OR motivo <> 'SIN_PAGO')
-ON DUPLICATE KEY UPDATE producto_id = VALUES(producto_id), cantidad = VALUES(cantidad), usuario_id = VALUES(usuario_id), fecha = VALUES(fecha);
+WHERE producto2 IS NOT NULL;
+-- La devolución de las canceladas, cuando se cancelaron (la del comprador, a su nombre; las demás, de
+-- la tarea de vencimientos).
+INSERT INTO movimiento_inventario (producto_id, insumo_id, tipo, cantidad, motivo, usuario_id, id_operacion, fecha)
+SELECT producto, NULL, 'ENTRADA', cantidad, 'VENTA_CANCELADA', IF(motivo = 'COMPRADOR', cliente, NULL),
+       CONCAT('prod-cancela-V-', LPAD(30000 + i, 6, '0'), '-', producto),
+       CASE motivo WHEN 'SIN_PAGO' THEN fecha + INTERVAL 15 MINUTE WHEN 'COMPRADOR' THEN fecha + INTERVAL 1 DAY ELSE fecha + INTERVAL 8 DAY END
+FROM prod_compra WHERE estado = 'CANCELADA';
+INSERT INTO movimiento_inventario (producto_id, insumo_id, tipo, cantidad, motivo, usuario_id, id_operacion, fecha)
+SELECT producto2, NULL, 'ENTRADA', 1, 'VENTA_CANCELADA', IF(motivo = 'COMPRADOR', cliente, NULL),
+       CONCAT('prod-cancela-V-', LPAD(30000 + i, 6, '0'), '-', producto2),
+       CASE motivo WHEN 'SIN_PAGO' THEN fecha + INTERVAL 15 MINUTE WHEN 'COMPRADOR' THEN fecha + INTERVAL 1 DAY ELSE fecha + INTERVAL 8 DAY END
+FROM prod_compra WHERE estado = 'CANCELADA' AND producto2 IS NOT NULL;
 
 DROP TEMPORARY TABLE IF EXISTS prod_compra;

@@ -9,13 +9,26 @@ veterinaria funcionando y para mostrar los flujos en la demo. No usa las cuentas
 | Archivo | Qué | Ids |
 |---|---|---|
 | 001 | 40 clientes y 5 rescatistas de la zona "de fondo" (no pueden iniciar sesión ni tienen teléfono: nunca reciben un WhatsApp); 128 mascotas, entre ellas Rocco, Mishi y Coco (cliente 1 de la demo) y Lola (cliente 2) | usuarios 3001 a 3045, mascotas 30001 a 30144 |
-| 002 | 30 productos con marca, precio y foto (6 por vencer, 6 con stock bajo) y 15 insumos; da de baja los productos e insumos que había antes (no los borra) | 3001 a 3030 |
-| 003 | 6 meses de agenda con la veterinaria de la demo (~720 turnos), consultas con diagnóstico, indicaciones, lo que se usó y factura; calendario sanitario | turnos 30001 a 30765 |
-| 004 | Fotos de las mascotas (14 de perro y 12 de gato, Unsplash) | — |
-| 005 | 44 adopciones en todos los estados; 4 son del rescatista de la demo. Las 2 rechazadas, también en el historial de rechazos (migración 023) | 30001 a 30044 |
-| 006 | 150 compras de la tienda (19 del cliente 1; la V-030002 está pagada y para retirar) | 30001 a 30150 |
-| 007 | 120 avisos de la campana para la veterinaria, el cliente 1 y el rescatista | 30001 a 30120 |
-| 008 | 22 reseñas, la mitad respondidas | 30001 a 30022 |
+| 002 | 30 productos con marca y precio (6 por vencer, 6 con stock bajo) y 17 insumos (con la vacuna o el antiparasitario del calendario que son); qué vence y hasta cuándo (029); da de baja los productos e insumos que había antes (no los borra) | 3001 a 3030, insumos 3001 a 3017 |
+| 003 | 6 meses de agenda con la veterinaria de la demo (~470 turnos) y la historia de las mascotas de la demo desde cachorros: consultas con diagnóstico, lo que se usó y factura; el calendario de cada mascota con el plan de su especie (cada dosis dada sale de una consulta, en orden y con los días mínimos). **Generado por `generar.py`** | turnos 30001 a 30760, eventos 31001 en adelante |
+| 004 | Una foto distinta para cada mascota (según su especie y su raza) y para cada producto (Unsplash, con los autores) | — |
+| 005 | 44 adopciones en todos los estados; 4 son del rescatista de la demo. Las 2 rechazadas, también en el historial de rechazos (migración 023). Cada chequeo atendido, con su consulta y su factura | 30001 a 30044 |
+| 006 | 150 compras de la tienda (19 del cliente 1; la V-030002 está pagada y para retirar), con sus plazos y sus movimientos (venta y devolución) | 30001 a 30150 |
+| 008 | 22 reseñas de clientes atendidos antes de escribirlas, la mitad respondidas. **Generado por `generar.py`** | 30001 a 30022 |
+| 009 | Los lotes de productos e insumos (028 y 029), de acuerdo con el stock | — |
+| 010 | Los movimientos de stock: lo que usó cada consulta y las cargas que hacen falta para que el stock cierre | — |
+| 011 | Los avisos de la campana, armados con lo que pasó (pedidos, reseñas, publicaciones, turnos, vacunas), con el texto del sistema | — |
+
+**`generar.py`** arma `003` y `008` (Python 3, sin librerías): la agenda se simula mascota por mascota
+para que nada quede inconsistente (una vacuna dada sin consulta, una dosis antes que la anterior, una
+reseña de alguien que nunca vino). Para cambiar algo de la agenda o de las reseñas, se cambia el
+generador y se vuelve a correr (`python base/semillas-produccion/generar.py`); no se editan los `.sql`
+a mano.
+
+**`controles.sql`** revisa que los datos cierren (solo lee): ninguna vacuna dada sin consulta, dosis en
+orden y con los días mínimos, cada turno atendido con su consulta y su factura, cada adopción terminada
+con su chequeo, el stock igual a sus movimientos y a sus lotes, ninguna foto repetida… Cada control
+tiene que dar 0. Se corre después de `cargar.sh`, contra la misma base.
 
 Ningún turno de este juego pisa uno que ya exista: si el horario está ocupado, el de acá queda
 cancelado. Una cuenta de fondo cuyo email ya exista no se carga.
