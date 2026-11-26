@@ -87,6 +87,10 @@ INSERT IGNORE INTO movimiento_inventario (producto_id, tipo, cantidad, motivo, u
 -- Las compras vuelven a su estado: se borran las vueltas del stock de las cancelaciones que hicieron
 -- las pruebas (su id_operacion es fijo y, si quedara, no se podrían volver a cancelar), y la V-000100
 -- y la V-000099 vuelven a tener su producto reservado.
+-- Desde la migración 028 la vuelta del stock es por lote: "cancela-V-000100-105-lote-{lote}".
 DELETE FROM movimiento_inventario
-  WHERE id_operacion IN ('cancela-V-000100-105', 'cancela-V-000099-113', 'cancela-V-000101-101');
+  WHERE id_operacion IN ('cancela-V-000100-105', 'cancela-V-000099-113', 'cancela-V-000101-101')
+     OR id_operacion LIKE 'cancela-V-000100-105-lote-%'
+     OR id_operacion LIKE 'cancela-V-000099-113-lote-%'
+     OR id_operacion LIKE 'cancela-V-000101-101-lote-%';
 UPDATE producto SET stock = stock - 1 WHERE id IN (105, 113);
