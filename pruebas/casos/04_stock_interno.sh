@@ -39,9 +39,10 @@ pedir DELETE /api/inventario/insumos/108/pedido
 esperar "Se desmarca el Ya pedido y vuelve a DISPONIBLE" 200 '"estado":"DISPONIBLE"'
 
 pedir POST /api/inventario/insumos/108/pedido
-pedir POST /api/inventario/insumos/108/stock '{"cantidad":20}'
+pedir POST /api/inventario/insumos/108/stock "{\"cantidad\":20,\"lote\":{\"vencimiento\":\"$(date -u -d '-3 hours +500 day' +%Y-%m-%d)\"}}"
 esperar "Al cargar stock (llegó el pedido) deja de estar Ya pedido" 200 '"estado":"DISPONIBLE"'
-pedir POST /api/inventario/insumos/108/retiro '{"cantidad":20}'
+LOTE_108=$(printf '%s' "$RESPUESTA" | grep -o '"lote":{"id":[0-9]*' | cut -d: -f3)
+pedir POST /api/inventario/insumos/108/retiro "{\"cantidad\":20,\"lote_id\":${LOTE_108:-0}}"
 
 # --- Reactivar un insumo dado de baja (el 109) ---
 pedir POST /api/inventario/insumos/109/reactivar

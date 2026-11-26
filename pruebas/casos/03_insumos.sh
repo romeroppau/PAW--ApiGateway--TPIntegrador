@@ -29,7 +29,7 @@ esperar "Un id que no es número da 404" 404
 pedir POST /api/inventario/insumos '{"nombre":"A","costo":-5,"stock":"diez"}'
 esperar "Un alta con datos inválidos da 400 por campo" 400 '"campos"'
 
-pedir POST /api/inventario/insumos '{"nombre":"Insumo de humo","costo":0,"stock":0}'
+pedir POST /api/inventario/insumos '{"nombre":"Insumo de humo","costo":0,"stock":0,"vence":false}'
 esperar "Alta con costo 0 y stock 0: queda EN_FALTA" 201 '"estado":"EN_FALTA"'
 NUEVO=$(printf '%s' "$RESPUESTA" | grep -o '"id":[0-9]*' | head -1 | cut -d: -f2)
 

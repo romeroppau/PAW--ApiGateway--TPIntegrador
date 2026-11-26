@@ -38,7 +38,7 @@ pedir POST /api/inventario/productos '{"nombre":"Sin CSRF"}'
 esperar "Un POST sin el token CSRF correcto da 403" 403
 CSRF=$CSRF_REAL
 
-pedir POST /api/inventario/productos '{"nombre":"Producto de humo","categoria":"ACCESORIO","especie":"TODAS","precio":100,"stock":1}'
+pedir POST /api/inventario/productos '{"nombre":"Producto de humo","categoria":"ACCESORIO","especie":"TODAS","precio":100,"stock":1,"vence":false}'
 esperar "Con el token CSRF correcto, el veterinario crea un producto" 201 '"Producto de humo"'
 
 cerrar_sesion

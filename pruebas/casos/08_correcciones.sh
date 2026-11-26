@@ -18,7 +18,7 @@ pedir POST /api/pacientes/turnos "{\"mascota_id\":101,\"fecha\":\"$MANIANA\",\"h
 esperar "Un turno a la hora de cierre da 400" 400 '"hora"'
 
 # --- Un insumo dado de baja no se descuenta ---
-pedir POST /api/inventario/insumos '{"nombre":"Insumo que se da de baja","costo":10,"stock":10}'
+pedir POST /api/inventario/insumos '{"nombre":"Insumo que se da de baja","costo":10,"stock":10,"vence":false}'
 esperar "Se crea un insumo para la prueba" 201 '"stock":10'
 INSUMO=$(printf '%s' "$RESPUESTA" | grep -o '"id":[0-9]*' | head -1 | cut -d: -f2)
 
@@ -51,7 +51,7 @@ esperar "Se quita el insumo de la consulta (queda la séxtuple)" 200 '"insumos":
 
 # --- El total de la factura tiene que entrar en la columna, y se valida antes de descontar ---
 # (El valor de la consulta ya no se edita: se pasa del máximo con un insumo carísimo.)
-pedir POST /api/inventario/insumos '{"nombre":"Insumo muy caro","costo":99999999,"stock":10}'
+pedir POST /api/inventario/insumos '{"nombre":"Insumo muy caro","costo":99999999,"stock":10,"vence":false}'
 esperar "Se crea un insumo carísimo para la prueba" 201 '"stock":10'
 CARO=$(printf '%s' "$RESPUESTA" | grep -o '"id":[0-9]*' | head -1 | cut -d: -f2)
 
