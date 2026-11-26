@@ -77,7 +77,8 @@ UPDATE usuario SET validado_en = UTC_TIMESTAMP() - INTERVAL 3 HOUR - INTERVAL (1
 WHERE id BETWEEN 3041 AND 3045 AND rol = 'RESCATISTA';
 
 -- Mascotas de los clientes de fondo: dos cada uno. Nombre, especie y raza salen de listas reales;
--- la edad va de cachorro a senior.
+-- la edad va de cachorro a senior, en días (003 arma el calendario de cada una con su edad: las mismas
+-- cuentas están en generar.py).
 INSERT INTO mascota
   (id, duenio_id, nombre, especie, raza, fecha_nacimiento, peso_kg, foto, foto_tipo, activo)
 WITH RECURSIVE n AS (SELECT 1 AS i UNION ALL SELECT i + 1 FROM n WHERE i < 80)
@@ -96,7 +97,7 @@ SELECT 30000 + i,
           ELT(1 + (i % 5), 'Europeo común', 'Siamés', 'Persa', 'Maine coon', 'Angora'),
           ELT(1 + (i % 9), 'Mestizo', 'Caniche toy', 'Labrador retriever', 'Ovejero alemán', 'Beagle',
               'Golden retriever', 'Bulldog francés', 'Border collie', 'Dachshund')),
-       @hoy - INTERVAL (5 + (i * 17) % 150) MONTH - INTERVAL (i * 7) % 28 DAY,
+       @hoy - INTERVAL ((5 + (i * 17) % 150) * 30 + (i * 7) % 28) DAY,
        IF(i % 3 = 0, 3.20 + (i % 5) * 0.6, ELT(1 + (i % 9), 14.5, 4.2, 31.0, 34.5, 12.8, 30.2, 11.6, 19.4, 8.9)),
        NULL, NULL, 1
 FROM n
@@ -108,10 +109,10 @@ ON DUPLICATE KEY UPDATE
 INSERT INTO mascota
   (id, duenio_id, nombre, especie, raza, fecha_nacimiento, peso_kg, foto, foto_tipo, activo)
 VALUES
-  (30081, @cliente1, 'Rocco', 'PERRO', 'Labrador retriever', @hoy - INTERVAL 4 YEAR - INTERVAL 3 MONTH, 32.40, NULL, NULL, 1),
-  (30082, @cliente1, 'Mishi', 'GATO',  'Europeo común',      @hoy - INTERVAL 2 YEAR - INTERVAL 7 MONTH,  4.10, NULL, NULL, 1),
-  (30083, @cliente1, 'Coco',  'PERRO', 'Caniche toy',        @hoy - INTERVAL 9 YEAR - INTERVAL 1 MONTH,  5.30, NULL, NULL, 1),
-  (30084, @cliente2, 'Lola',  'PERRO', 'Beagle',             @hoy - INTERVAL 14 MONTH,                 11.20, NULL, NULL, 1)
+  (30081, @cliente1, 'Rocco', 'PERRO', 'Labrador retriever', @hoy - INTERVAL 1550 DAY, 32.40, NULL, NULL, 1),
+  (30082, @cliente1, 'Mishi', 'GATO',  'Europeo común',      @hoy - INTERVAL 943 DAY,   4.10, NULL, NULL, 1),
+  (30083, @cliente1, 'Coco',  'PERRO', 'Caniche toy',        @hoy - INTERVAL 3315 DAY,  5.30, NULL, NULL, 1),
+  (30084, @cliente2, 'Lola',  'PERRO', 'Beagle',             @hoy - INTERVAL 426 DAY,  11.20, NULL, NULL, 1)
 ON DUPLICATE KEY UPDATE
   duenio_id = VALUES(duenio_id), nombre = VALUES(nombre), especie = VALUES(especie), raza = VALUES(raza),
   fecha_nacimiento = VALUES(fecha_nacimiento), peso_kg = VALUES(peso_kg), activo = VALUES(activo);
