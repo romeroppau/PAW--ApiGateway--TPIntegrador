@@ -4,6 +4,8 @@
 --   libre), recortadas a 400 x 400: alimento en un comedero, comprimidos, correa,
 --   collar, rascador, cama y juguetes.
 --   Insumos 3001 a 3015: los de una veterinaria (jeringas, vacunas, gasas); uno en falta y dos con stock bajo.
+--   Migración 029: vencen los productos con fecha (alimentos y medicamentos) y los insumos estériles,
+--   líquidos y las vacunas, con su fecha; los accesorios, los guantes, el algodón y la venda no.
 --   Los productos y los insumos que ya había (de la Entrega 4, algunos repetidos) se dan de baja: no
 --   se borran, pero dejan de verse en la tienda y en las listas.
 -- Correr de nuevo vuelve stock, precio y vencimiento a estos valores, pero no cambia la foto de un
@@ -87,6 +89,19 @@ VALUES
   (3015, 'Venda cohesiva 5 cm', 18, 1300.00, 'DISPONIBLE', 1)
 ON DUPLICATE KEY UPDATE
   nombre = VALUES(nombre), stock = VALUES(stock), costo = VALUES(costo), estado = VALUES(estado), activo = VALUES(activo);
+
+-- Si vence y hasta cuándo (migración 029). Los lotes los arma 009_lotes.sql.
+UPDATE producto SET vence = (fecha_vencimiento IS NOT NULL) WHERE id BETWEEN 3001 AND 3030;
+UPDATE insumo SET
+  vence = id NOT IN (3004, 3006, 3015),
+  fecha_vencimiento = CASE id
+    WHEN 3001 THEN @hoy + INTERVAL 700 DAY WHEN 3002 THEN @hoy + INTERVAL 690 DAY
+    WHEN 3003 THEN @hoy + INTERVAL 800 DAY WHEN 3005 THEN @hoy + INTERVAL 500 DAY
+    WHEN 3007 THEN @hoy + INTERVAL 600 DAY WHEN 3008 THEN @hoy + INTERVAL 400 DAY
+    WHEN 3009 THEN @hoy + INTERVAL 150 DAY WHEN 3010 THEN @hoy + INTERVAL 160 DAY
+    WHEN 3011 THEN @hoy + INTERVAL 170 DAY WHEN 3012 THEN @hoy + INTERVAL 180 DAY
+    WHEN 3014 THEN @hoy + INTERVAL 420 DAY ELSE NULL END
+WHERE id BETWEEN 3001 AND 3015;
 
 -- Movimientos: una carga de cada producto y de cada insumo por mes, en los últimos 6 meses, hechas por
 -- la veterinaria. id_operacion fijo: una recarga no los repite, solo les corre la fecha.

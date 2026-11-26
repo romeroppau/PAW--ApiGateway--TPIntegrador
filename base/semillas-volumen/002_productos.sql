@@ -3,12 +3,14 @@
 --                Reportes (los que vencen dentro de dias_liquidar, 30 por defecto) para Publicitar.
 --   2011 a 2018: con stock bajo (de 0 a 7 unidades).
 --   2019 a 2030: normales.
+--   Migración 029: los alimentos y los antiparasitarios vencen (todos con fecha); los juguetes
+--   (accesorios) no vencen y no tienen fecha.
 -- Correr de nuevo vuelve el stock, el precio y el vencimiento a estos valores.
 
 SET @hoy = DATE(UTC_TIMESTAMP() - INTERVAL 3 HOUR);
 
 INSERT INTO producto
-  (id, nombre, descripcion, precio, stock, categoria, especie_destino, etapa_vida, fecha_vencimiento, activo)
+  (id, nombre, descripcion, precio, stock, categoria, especie_destino, etapa_vida, fecha_vencimiento, vence, activo)
 WITH RECURSIVE n AS (SELECT 1 AS i UNION ALL SELECT i + 1 FROM n WHERE i < 30)
 SELECT 2000 + i,
        CONCAT(ELT(1 + (i % 3), 'Alimento', 'Antiparasitario', 'Juguete'), ' ',
@@ -21,15 +23,16 @@ SELECT 2000 + i,
        ELT(1 + (i % 3), 'ALIMENTO', 'MEDICAMENTO', 'ACCESORIO'),
        ELT(1 + (i % 3), 'PERRO', 'GATO', 'TODAS'),
        'TODAS',
-       CASE WHEN i <= 10 THEN @hoy + INTERVAL (2 + i * 3) DAY
-            WHEN i % 3 = 0 THEN NULL
+       CASE WHEN i % 3 = 2 THEN NULL
+            WHEN i <= 10 THEN @hoy + INTERVAL (2 + i * 3) DAY
             ELSE @hoy + INTERVAL (120 + i * 5) DAY END,
+       i % 3 <> 2,
        1
 FROM n
 ON DUPLICATE KEY UPDATE
   nombre = VALUES(nombre), descripcion = VALUES(descripcion), precio = VALUES(precio), stock = VALUES(stock),
   categoria = VALUES(categoria), especie_destino = VALUES(especie_destino), etapa_vida = VALUES(etapa_vida),
-  fecha_vencimiento = VALUES(fecha_vencimiento), activo = VALUES(activo);
+  fecha_vencimiento = VALUES(fecha_vencimiento), vence = VALUES(vence), activo = VALUES(activo);
 
 -- Movimientos de stock de los productos del volumen: una carga por mes en los últimos 6 meses
 -- (para que la pestaña Movimientos de Reportes tenga páginas). id_operacion fijo: una recarga
