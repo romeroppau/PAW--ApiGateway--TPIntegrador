@@ -17,6 +17,9 @@ ON DUPLICATE KEY UPDATE
   telefono = VALUES(telefono),
   rol = VALUES(rol),
   organizacion = VALUES(organizacion),
+  -- Sin el motivo: si en dev rechazaron a un rescatista de prueba, volver a PENDIENTE o APROBADO con el
+  -- motivo puesto viola ck_usuario_motivo_rechazo (migración 022).
+  motivo_rechazo = NULL,
   estado_validacion = VALUES(estado_validacion),
   intentos_fallidos = 0,
   primer_fallo_en = NULL,
