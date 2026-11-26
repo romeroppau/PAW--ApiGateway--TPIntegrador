@@ -113,7 +113,7 @@ pedir POST "/api/pacientes/consultas/${CONSULTA_LEU:-0}/insumos" '{"insumo_id":1
 esperar "Se carga la triple felina" 201 '"aplicacion":"TRIPLE_FELINA"'
 pedir POST "/api/pacientes/consultas/${CONSULTA_LEU:-0}/finalizar"
 esperar "Sin stock tampoco se finaliza" 409 'Stock insuficiente'
-pedir POST /api/inventario/insumos/191/stock '{"cantidad":3}'
+pedir POST /api/inventario/insumos/191/stock "{\"cantidad\":3,\"lote\":{\"vencimiento\":\"$(date -u -d '-3 hours +200 day' +%Y-%m-%d)\"}}"
 esperar "Se carga stock de la vacuna (desde la consulta)" 200 '"stock":3'
 pedir POST "/api/pacientes/consultas/${CONSULTA_LEU:-0}/finalizar"
 esperar "Ahora sí se finaliza" 200 '"numero":"C-'
