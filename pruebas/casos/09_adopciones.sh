@@ -341,6 +341,15 @@ pedir GET /api/adopciones/101/detalle
 esperar "Pero ve el detalle de su adopción" 200 '"estado":"FINALIZADA"'
 pedir GET /api/notificaciones
 esperar "A la rescatista le llegó el aviso del turno del chequeo" 200 'tiene turno para el chequeo de adopción de Pipa'
+esperar "Y el de la adopción completa (27/11)" 200 '¡Se completó la adopción de Pipa!'
+# 27/11: un solo aviso del turno del chequeo. Al cargarlo en la agenda, Pacientes ya no le avisa a la
+# rescatista (era un segundo aviso, con otro texto).
+TOTAL=$((TOTAL + 1))
+if printf '%s' "$RESPUESTA" | grep -qF 'Tenés turno de chequeo de adopción para Pipa'; then
+  FALLAS=$((FALLAS + 1)); echo "  FALLA  La rescatista no recibe el aviso repetido del turno del chequeo"
+else
+  echo "  ok     La rescatista no recibe el aviso repetido del turno del chequeo"
+fi
 
 # --- Dar de baja con postulantes (24/11: no hay más "cancelar"; la baja es la única forma) ---
 pedir POST "/api/adopciones/${ADOPCION_CANELA:-0}/cancelar"
@@ -415,6 +424,19 @@ esperar "La veterinaria carga el turno de chequeo de Canela" 201 '"CHEQUEO_ADOPC
 TURNO_CANELA=$(primer_id)
 pedir POST "/api/adopciones/${ADOPCION_CANELA2:-0}/chequeo" "{\"turno_id\":${TURNO_CANELA:-0}}"
 esperar "  y lo asocia a la adopción" 200 '"estado":"CHEQUEO_PENDIENTE"'
+
+# 27/11: si la veterinaria reprograma el chequeo en la agenda, el aviso le llega también al adoptante.
+for HORA in 15:50 15:40 15:30 15:20 15:10 15:00 14:50 14:40 14:30 14:20; do
+  pedir POST "/api/pacientes/turnos/${TURNO_CANELA:-0}/reprogramar" "{\"fecha\":\"$DIA_CHEQUEO\",\"hora\":\"$HORA\"}"
+  [ "$CODIGO" = 200 ] && break
+done
+esperar "La veterinaria reprograma el turno del chequeo de Canela" 200 '"estado":"PROGRAMADO"'
+iniciar_sesion cliente2@prueba.huellavet 'Cliente-Prueba-2026'
+pedir GET /api/notificaciones
+esperar "  y al adoptante le llega el aviso del cambio" 200 'Cambiamos el turno del chequeo de adopción de Canela: ahora es el'
+iniciar_sesion rescatista@prueba.huellavet 'Rescatista-Prueba-2026'
+pedir GET /api/notificaciones
+esperar "  y a la rescatista, con el adoptante" 200 'Cambiamos el turno del chequeo de adopción de Canela con Tomás Aguirre'
 
 iniciar_sesion rescatista@prueba.huellavet 'Rescatista-Prueba-2026'
 pedir DELETE "/api/adopciones/publicaciones/${PUBLICACION_CANELA2:-0}"
