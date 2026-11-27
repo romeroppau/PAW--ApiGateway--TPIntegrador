@@ -13,6 +13,13 @@ esperar "Inventario responde y llega a la base" 200 '"funciona"'
 pedir GET /api/tienda/productos/999999
 esperar "Un producto inexistente da 404 en JSON" 404 '"error"'
 
+# 27/11 (devolución del profesor): las rutas que no existen para nginx también responden JSON, no su página HTML.
+pedir GET /api/no-existe
+esperar "Una ruta de la API que no existe da 404 en JSON" 404 '{"error":"Recurso no encontrado"}'
+
+pedir GET /internal/notificaciones
+esperar "Una ruta interna desde afuera da 404 en JSON" 404 '{"error":"Recurso no encontrado"}'
+
 pedir GET /api/inventario/productos
 esperar "El panel del veterinario sin sesión da 401" 401
 

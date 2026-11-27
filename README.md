@@ -201,12 +201,15 @@ GitHub Actions (`pruebas.yml`) corre en cada push y pull request: comprueba que 
 
 | Workflow | Cuándo | Qué hace |
 | --- | --- | --- |
-| **Motor diario** | Todos los días a las 09:00 de Argentina, en dev y producción (y a mano, eligiendo el entorno) | `POST /api/reportes/tareas/diaria` (avisos de vacunas, controles de adopción, stock bajo y qué liquidar) y después `POST /api/notificaciones/tareas/enviar` |
-| **Enviar avisos** | Cada 15 minutos, contra el entorno de la variable `URL_BASE` del repo | `POST /api/notificaciones/tareas/enviar`: manda por WhatsApp los avisos pendientes |
+| **Enviar avisos** | Cada 5 minutos, en dev y producción. Cada corrida dura una hora y se vuelve a disparar sola (ver abajo) | `POST /api/notificaciones/tareas/enviar` (WhatsApp pendientes) y `POST /api/tienda/tareas/vencer` (compras vencidas, recordatorios de retiro, reintegros pendientes). Desde las 9:00 de Argentina dispara el **Motor diario** si ese día todavía no corrió |
+| **Motor diario** | Una vez por día desde las 9:00 de Argentina (la dispara Enviar avisos; el horario de las 12:00 UTC queda de respaldo), en dev y producción por separado. También a mano, eligiendo el entorno | `POST /api/inventario/tareas/vencer-lotes` (baja de los lotes vencidos de productos e insumos), `POST /api/reportes/tareas/diaria` (avisos de vacunas, controles de adopción, stock bajo y qué liquidar) y `POST /api/notificaciones/tareas/enviar` |
 | **Keepalive** | Cada 14 minutos | Consulta la salud de producción para que Render no apague el servicio |
 | **Pruebas** | En cada push y pull request | Ver [Pruebas](#pruebas) |
 
-Las tareas usan el header `X-Tarea-Token` con los secrets `TAREAS_TOKEN` (producción) y `TAREAS_TOKEN_DEV` (dev). GitHub solo corre los horarios programados desde la rama `main`.
+- Las tareas usan el header `X-Tarea-Token` con los secrets `TAREAS_TOKEN` (producción) y `TAREAS_TOKEN_DEV` (dev). Todas son idempotentes: correr de más no repite avisos ni movimientos.
+- GitHub corre los horarios programados con la versión del workflow de la rama por defecto del repo (`dev`).
+- **Por qué Enviar avisos se dispara sola (27/11):** GitHub no garantiza los horarios programados. Con "cada 5 minutos" la disparó 16 veces en dos días y medio, y el Motor diario de las 9:00 llegó a arrancar nueve horas tarde. Ahora cada corrida hace las tareas cada 5 minutos durante una hora y, al terminar, se vuelve a disparar con el `GITHUB_TOKEN` (GitHub permite `workflow_dispatch` desde un workflow). El horario programado queda de respaldo: si la cadena se corta, la retoma. Nunca corren dos a la vez (`concurrency`). Para frenarla, se deshabilita el workflow en Actions.
+- Dev y producción van por separado: si dev falla (por ejemplo, porque `TAREAS_TOKEN_DEV` no coincide con el de Render), producción corre igual. Una corrida queda en rojo solo si falló producción.
 
 ---
 
