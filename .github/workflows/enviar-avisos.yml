@@ -1,14 +1,23 @@
-# Tareas cada 5 minutos (el mínimo de GitHub; 25/11, antes 15), en dev y en producción:
+# Tareas frecuentes, en dev y en producción, cada 5 minutos:
 #
 # 1. POST /api/notificaciones/tareas/enviar (Backend): manda por WhatsApp los avisos pendientes.
 # 2. POST /api/tienda/tareas/vencer (Inventario): cancela las compras vencidas, manda los recordatorios
 #    de retiro y los avisos de cancelación, y reintenta los reintegros de Mercado Pago que fallaron.
 #
-# Los WhatsApp de turnos, postulaciones, compras y cuenta ya salen en el momento (Backend, envío
-# inmediato); esta tarea manda los del motor diario y reintenta los que fallaron.
+# Y una vez por día, desde las 9:00 de Argentina, dispara el Motor diario (motor-diario.yml) si ese
+# día todavía no corrió.
 #
-# Las dos usan el header X-Tarea-Token: en producción el secret TAREAS_TOKEN y en dev TAREAS_TOKEN_DEV
-# (si no existe, TAREAS_TOKEN). También se puede correr a mano desde Actions ("Run workflow").
+# Por qué cada corrida dura una hora (27/11): GitHub no garantiza los horarios programados. Con
+# "cada 5 minutos", GitHub la disparó 16 veces en dos días y medio (una cada 4 a 8 horas), y el motor
+# diario de las 9:00 arrancó a las 18:00. Ahora cada corrida hace las tareas cada 5 minutos durante una
+# hora y, al terminar, se vuelve a disparar sola (workflow_dispatch con el GITHUB_TOKEN, que GitHub
+# permite). El horario programado queda de respaldo: si la cadena se corta, la retoma la próxima vez
+# que GitHub lo dispare. "concurrency" hace que nunca corran dos a la vez. El repositorio es público:
+# los minutos de Actions no se cobran. Para frenarla: deshabilitar el workflow en Actions.
+#
+# Las tareas usan el header X-Tarea-Token: en producción el secret TAREAS_TOKEN y en dev
+# TAREAS_TOKEN_DEV (si no existe, TAREAS_TOKEN). Todas son idempotentes: correr de más no repite nada.
+# Si dev falla (por ejemplo, el token de dev no coincide), producción sigue igual.
 
 name: Enviar avisos
 
@@ -26,59 +35,106 @@ on:
           - dev
           - prod
           - ambos
+      vueltas:
+        description: "Cuántas vueltas (una cada 5 minutos) antes de volver a dispararse"
+        required: true
+        default: "12"
 
-# Si una corrida se atrasa, la siguiente espera en vez de pisarse con ella.
+# Nunca dos a la vez: la que se dispara mientras otra corre, espera.
 concurrency:
   group: enviar-avisos
   cancel-in-progress: false
 
+permissions:
+  actions: write   # para volver a dispararse y disparar el motor diario
+  contents: read
+
 jobs:
   tareas:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
-    strategy:
-      # Si falla un entorno, el otro corre igual.
-      fail-fast: false
-      matrix:
-        include:
-          - entorno: dev
-            url: https://paw-apigateway-tpintegrador-dev.onrender.com
-          - entorno: prod
-            url: https://paw-apigateway-tpintegrador.onrender.com
+    timeout-minutes: 80
 
     env:
-      URL: ${{ matrix.url }}
-      TOKEN: ${{ matrix.entorno == 'dev' && (secrets.TAREAS_TOKEN_DEV || secrets.TAREAS_TOKEN) || secrets.TAREAS_TOKEN }}
-      CORRE: ${{ github.event_name == 'schedule' || inputs.entorno == 'ambos' || inputs.entorno == matrix.entorno }}
+      URL_PROD: https://paw-apigateway-tpintegrador.onrender.com
+      URL_DEV: https://paw-apigateway-tpintegrador-dev.onrender.com
+      TOKEN_PROD: ${{ secrets.TAREAS_TOKEN }}
+      TOKEN_DEV: ${{ secrets.TAREAS_TOKEN_DEV || secrets.TAREAS_TOKEN }}
+      ENTORNO: ${{ inputs.entorno || 'ambos' }}
+      VUELTAS: ${{ inputs.vueltas || '12' }}
+      GH_TOKEN: ${{ github.token }}
 
     steps:
-      - name: Enviar los WhatsApp pendientes (${{ matrix.entorno }})
-        if: env.CORRE == 'true'
+      - name: Tareas cada 5 minutos durante una hora
         run: |
-          if [ -z "$TOKEN" ]; then
-            echo "::warning::Falta el secret TAREAS_TOKEN (o TAREAS_TOKEN_DEV) para ${{ matrix.entorno }}."
-            exit 0
-          fi
-          RESUMEN=$(curl --fail-with-body -sS --max-time 90 -X POST \
-            -H "X-Tarea-Token: $TOKEN" \
-            "$URL/api/notificaciones/tareas/enviar")
-          echo "$RESUMEN"
-          # Token de WhatsApp vencido, variable faltante o plantilla mal: la tarea corre (200) pero no
-          # sale ningún mensaje. Se marca en el resumen de Actions para que se vea.
-          if printf '%s' "$RESUMEN" | grep -q '"error_configuracion"'; then
-            echo "::warning::${{ matrix.entorno }}: WhatsApp no envió avisos por un problema de configuración: $RESUMEN"
-          fi
-          if printf '%s' "$RESUMEN" | grep -q '"descartadas":[1-9]'; then
-            echo "::notice::${{ matrix.entorno }}: hay avisos que no van a salir por WhatsApp (ver notificacion.ultimo_error)"
-          fi
+          set -u
+          : > fallas-prod.txt
 
-      - name: Vencimientos y recordatorios de la tienda (${{ matrix.entorno }})
-        if: env.CORRE == 'true' && !cancelled()
+          # Un POST con el token. Reintenta si Render está despertando (la primera visita tarda).
+          tarea() {   # tarea <entorno> <url> <token> <ruta>
+            local respuesta
+            if respuesta=$(curl --fail-with-body -sS --max-time 90 --retry 3 --retry-delay 15 --retry-all-errors \
+                             -X POST -H "X-Tarea-Token: $3" "$2$4" 2>&1); then
+              echo "  $1 $4: $respuesta"
+              if printf '%s' "$respuesta" | grep -q '"error_configuracion"'; then
+                echo "::warning::$1: WhatsApp no envió avisos por un problema de configuración: $respuesta"
+              fi
+            else
+              echo "::warning::$1 $4 falló: $respuesta"
+              if [ "$1" = prod ]; then echo "$(date -u +%H:%M) $4" >> fallas-prod.txt; fi
+            fi
+          }
+
+          entorno() {   # entorno <nombre> <url> <token>
+            if [ -z "$3" ]; then
+              echo "::warning::Falta el secret TAREAS_TOKEN (o TAREAS_TOKEN_DEV) para $1."
+              return
+            fi
+            tarea "$1" "$2" "$3" /api/notificaciones/tareas/enviar
+            tarea "$1" "$2" "$3" /api/tienda/tareas/vencer
+          }
+
+          # El motor diario, una vez por día desde las 9:00 de Argentina: si hoy todavía no hay una
+          # corrida para producción ("Motor diario (ambos)" o "(prod)"), la dispara.
+          motor_diario() {
+            local hora hoy desde
+            hora=$(TZ=America/Argentina/Buenos_Aires date +%H)
+            [ "$hora" -ge 9 ] || return 0
+            hoy=$(TZ=America/Argentina/Buenos_Aires date +%F)
+            desde="${hoy}T12:00:00Z"   # las 9:00 de Argentina (UTC-3, sin horario de verano)
+            if gh run list --repo "$GITHUB_REPOSITORY" --workflow motor-diario.yml --limit 30 \
+                 --json createdAt,displayTitle \
+                 --jq "[.[] | select(.createdAt >= \"$desde\" and (.displayTitle | test(\"ambos|prod\")))] | length" \
+                 | grep -qx 0; then
+              echo "Hoy todavía no corrió el motor diario: lo disparo."
+              gh workflow run motor-diario.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME" -f entorno=ambos \
+                || echo "::warning::No se pudo disparar el motor diario."
+            fi
+          }
+
+          for vuelta in $(seq 1 "$VUELTAS"); do
+            inicio=$(date +%s)
+            echo "=== Vuelta $vuelta de $VUELTAS ($(TZ=America/Argentina/Buenos_Aires date '+%d/%m %H:%M') en Argentina)"
+            if [ "$ENTORNO" = prod ] || [ "$ENTORNO" = ambos ]; then entorno prod "$URL_PROD" "$TOKEN_PROD"; fi
+            if [ "$ENTORNO" = dev ] || [ "$ENTORNO" = ambos ]; then entorno dev "$URL_DEV" "$TOKEN_DEV"; fi
+            if [ "$ENTORNO" = ambos ]; then motor_diario; fi
+            if [ "$vuelta" -lt "$VUELTAS" ]; then
+              espera=$(( inicio + 300 - $(date +%s) ))
+              if [ "$espera" -gt 0 ]; then sleep "$espera"; fi
+            fi
+          done
+
+      # Pase lo que pase con las tareas (salvo que alguien la cancele a mano), sigue la cadena.
+      - name: Volver a disparar esta tarea
+        if: success() || failure()
         run: |
-          if [ -z "$TOKEN" ]; then
-            exit 0
+          gh workflow run enviar-avisos.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME" \
+            -f entorno="$ENTORNO" -f vueltas="$VUELTAS"
+
+      # Si producción falló en alguna vuelta, la corrida queda en rojo (dev solo avisa).
+      - name: Resultado de producción
+        run: |
+          if [ -s fallas-prod.txt ]; then
+            echo "::error::Producción falló en: $(tr -s '[:space:]' ' ' < fallas-prod.txt)"
+            exit 1
           fi
-          curl --fail-with-body -sS --max-time 90 -X POST \
-            -H "X-Tarea-Token: $TOKEN" \
-            "$URL/api/tienda/tareas/vencer"
-          echo
+          echo "Producción: todas las vueltas bien."

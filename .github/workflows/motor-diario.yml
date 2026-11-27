@@ -1,14 +1,23 @@
-# Tarea diaria del motor de recomendaciones y avisos (Entrega 5, rol 4).
+# Tarea diaria (Entrega 5, rol 4), en dev y en producción:
 #
-# Corre una vez por día a las 09:00 de Argentina (12:00 UTC) y también se puede disparar a mano
-# desde la pestaña Actions ("Run workflow") eligiendo dev o producción.
+# 1. POST /api/inventario/tareas/vencer-lotes (Inventario, 27/11): da de baja el stock de los lotes
+#    vencidos, de productos y de insumos (movimiento VENCIMIENTO) y le avisa a la veterinaria.
+# 2. POST /api/reportes/tareas/diaria (Reportes): evalúa las reglas del motor (vacuna próxima, vacuna
+#    vencida, control de adopción, stock bajo y qué liquidar) y deja cada aviso en Backend con su
+#    id_operacion (correrlo dos veces el mismo día no repite ningún aviso).
+# 3. POST /api/notificaciones/tareas/enviar (Backend): despacha los WhatsApp que acaban de quedar
+#    pendientes (los de canal WEB ya están en la campana).
 #
-# 1. POST /api/reportes/tareas/diaria evalúa las reglas del motor (vacuna próxima, vacuna vencida,
-#    control de adopción, stock bajo y qué liquidar) y deja cada aviso en Backend con su id_operacion.
-# 2. POST /api/notificaciones/tareas/enviar despacha los avisos de WhatsApp que acaban de quedar
-#    pendientes (los de canal WEB ya están disponibles en la campana).
+# Quién la dispara (27/11): todos los días desde las 9:00 de Argentina, la cadena de "Enviar avisos"
+# (enviar-avisos.yml), si ese día todavía no corrió. El horario programado (12:00 UTC = 9:00 de
+# Argentina) queda de respaldo: GitHub no garantiza los horarios y llegó a arrancarla nueve horas tarde.
+# También se puede correr a mano desde Actions ("Run workflow"), eligiendo dev, producción o ambos.
+#
+# Dev y producción son dos trabajos separados: si dev falla (por ejemplo, el token de dev no
+# coincide), producción corre igual. Cada pedido reintenta si Render está despertando.
 
 name: Motor diario
+run-name: Motor diario (${{ inputs.entorno || 'ambos' }})
 
 on:
   schedule:
@@ -18,57 +27,61 @@ on:
       entorno:
         description: 'Entorno donde correr el motor diario'
         required: true
-        default: 'dev'
+        default: 'ambos'
         type: choice
         options:
           - dev
           - prod
           - ambos
 
+concurrency:
+  group: motor-diario
+  cancel-in-progress: false
+
 jobs:
   motor-diario:
+    name: motor-diario (${{ matrix.entorno }})
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
+    strategy:
+      # Si falla un entorno, el otro corre igual.
+      fail-fast: false
+      matrix:
+        include:
+          - entorno: dev
+            url: https://paw-apigateway-tpintegrador-dev.onrender.com
+          - entorno: prod
+            url: https://paw-apigateway-tpintegrador.onrender.com
+
+    env:
+      URL: ${{ matrix.url }}
+      TOKEN: ${{ matrix.entorno == 'dev' && (secrets.TAREAS_TOKEN_DEV || secrets.TAREAS_TOKEN) || secrets.TAREAS_TOKEN }}
+      CORRE: ${{ github.event_name == 'schedule' || (inputs.entorno || 'ambos') == 'ambos' || inputs.entorno == matrix.entorno }}
 
     steps:
-      - name: Ejecutar motor diario y envío en dev
-        if: github.event_name == 'schedule' || inputs.entorno == 'dev' || inputs.entorno == 'ambos'
-        env:
-          URL: https://paw-apigateway-tpintegrador-dev.onrender.com
-          TOKEN: ${{ secrets.TAREAS_TOKEN_DEV || secrets.TAREAS_TOKEN }}
+      - name: Baja de los lotes vencidos (${{ matrix.entorno }})
+        if: env.CORRE == 'true'
         run: |
           if [ -z "$TOKEN" ]; then
             echo "::warning::Falta configurar el secret TAREAS_TOKEN (o TAREAS_TOKEN_DEV) en el repositorio."
             exit 0
           fi
-          echo "=== Motor diario (dev): POST $URL/api/reportes/tareas/diaria"
-          curl --fail --silent --show-error --max-time 60 -X POST \
-            -H "X-Tarea-Token: $TOKEN" \
-            "$URL/api/reportes/tareas/diaria"
-          echo
-          echo "=== Envío de WhatsApp pendientes (dev): POST $URL/api/notificaciones/tareas/enviar"
-          curl --fail --silent --show-error --max-time 60 -X POST \
-            -H "X-Tarea-Token: $TOKEN" \
-            "$URL/api/notificaciones/tareas/enviar"
+          curl --fail-with-body -sS --max-time 90 --retry 3 --retry-delay 15 --retry-all-errors -X POST \
+            -H "X-Tarea-Token: $TOKEN" "$URL/api/inventario/tareas/vencer-lotes"
           echo
 
-      - name: Ejecutar motor diario y envío en producción
-        if: github.event_name == 'schedule' || inputs.entorno == 'prod' || inputs.entorno == 'ambos'
-        env:
-          URL: https://paw-apigateway-tpintegrador.onrender.com
-          TOKEN: ${{ secrets.TAREAS_TOKEN }}
+      - name: Motor de recomendaciones (${{ matrix.entorno }})
+        if: env.CORRE == 'true' && !cancelled()
         run: |
-          if [ -z "$TOKEN" ]; then
-            echo "::warning::Falta configurar el secret TAREAS_TOKEN en el repositorio."
-            exit 0
-          fi
-          echo "=== Motor diario (producción): POST $URL/api/reportes/tareas/diaria"
-          curl --fail --silent --show-error --max-time 60 -X POST \
-            -H "X-Tarea-Token: $TOKEN" \
-            "$URL/api/reportes/tareas/diaria"
+          if [ -z "$TOKEN" ]; then exit 0; fi
+          curl --fail-with-body -sS --max-time 90 --retry 3 --retry-delay 15 --retry-all-errors -X POST \
+            -H "X-Tarea-Token: $TOKEN" "$URL/api/reportes/tareas/diaria"
           echo
-          echo "=== Envío de WhatsApp pendientes (producción): POST $URL/api/notificaciones/tareas/enviar"
-          curl --fail --silent --show-error --max-time 60 -X POST \
-            -H "X-Tarea-Token: $TOKEN" \
-            "$URL/api/notificaciones/tareas/enviar"
+
+      - name: Envío de los WhatsApp pendientes (${{ matrix.entorno }})
+        if: env.CORRE == 'true' && !cancelled()
+        run: |
+          if [ -z "$TOKEN" ]; then exit 0; fi
+          curl --fail-with-body -sS --max-time 90 --retry 3 --retry-delay 15 --retry-all-errors -X POST \
+            -H "X-Tarea-Token: $TOKEN" "$URL/api/notificaciones/tareas/enviar"
           echo
