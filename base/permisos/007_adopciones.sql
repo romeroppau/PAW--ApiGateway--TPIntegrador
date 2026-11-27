@@ -15,3 +15,7 @@ GRANT SELECT ON {{DB_NAME}}.usuario  TO 'adopciones'@'%';
 GRANT SELECT ON {{DB_NAME}}.mascota  TO 'adopciones'@'%';
 GRANT SELECT ON {{DB_NAME}}.turno    TO 'adopciones'@'%';
 GRANT SELECT ON {{DB_NAME}}.consulta TO 'adopciones'@'%';
+
+-- Pacientes lee la adopción (27/11): cuando la veterinaria reprograma o cancela en la agenda el turno
+-- del chequeo, el aviso le llega también al adoptante (adopcion.adoptante_id por turno_chequeo_id).
+GRANT SELECT ON {{DB_NAME}}.adopcion TO 'pacientes'@'%';

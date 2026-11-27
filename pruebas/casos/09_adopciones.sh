@@ -266,11 +266,12 @@ esperar "Sin chequeo no se completa (409)" 409
 pedir POST /api/adopciones/101/chequeo '{"turno_id":101}'
 esperar "Un turno que no es de chequeo no sirve (400)" 400 'no es un chequeo de adopción'
 
-# El chequeo es un turno común de hoy. Se prueba con varios horarios: en dev, las corridas
+# El chequeo es un turno común de mañana (27/11: hoy no se puede dar un turno en una hora que ya
+# pasó, y el humo corre a cualquier hora). Se prueba con varios horarios: en dev, las corridas
 # anteriores pueden haber ocupado alguno.
-HOY=$(date -u -d '3 hours ago' +%F)
+DIA_CHEQUEO=$(date -u -d '3 hours ago +1 day' +%F)
 for HORA in 19:50 19:40 19:30 19:20 19:10 19:00 18:50 18:40 18:30 18:20; do
-  pedir POST /api/pacientes/turnos "{\"mascota_id\":902,\"fecha\":\"$HOY\",\"hora\":\"$HORA\",\"motivo\":\"CHEQUEO_ADOPCION\"}"
+  pedir POST /api/pacientes/turnos "{\"mascota_id\":902,\"fecha\":\"$DIA_CHEQUEO\",\"hora\":\"$HORA\",\"motivo\":\"CHEQUEO_ADOPCION\"}"
   [ "$CODIGO" = 201 ] && break
 done
 esperar "La veterinaria carga el turno de chequeo de Pipa" 201 '"CHEQUEO_ADOPCION"'
@@ -407,7 +408,7 @@ pedir POST "/api/adopciones/${ADOPCION_CANELA2:-0}/elegir" "{\"postulacion_id\":
 esperar "La rescatista lo elige" 200 '"estado":"ADOPTANTE_ELEGIDO"'
 iniciar_sesion vet@prueba.huellavet 'Vet-Prueba-2026'
 for HORA in 18:10 18:00 17:50 17:40 17:30 17:20 17:10 17:00 16:50 16:40; do
-  pedir POST /api/pacientes/turnos "{\"mascota_id\":901,\"fecha\":\"$HOY\",\"hora\":\"$HORA\",\"motivo\":\"CHEQUEO_ADOPCION\"}"
+  pedir POST /api/pacientes/turnos "{\"mascota_id\":901,\"fecha\":\"$DIA_CHEQUEO\",\"hora\":\"$HORA\",\"motivo\":\"CHEQUEO_ADOPCION\"}"
   [ "$CODIGO" = 201 ] && break
 done
 esperar "La veterinaria carga el turno de chequeo de Canela" 201 '"CHEQUEO_ADOPCION"'
